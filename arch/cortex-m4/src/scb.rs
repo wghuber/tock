@@ -55,3 +55,18 @@ pub unsafe fn reset() {
     let reset = (0x5FA << 16) | (aircr & (0x7 << 8)) | (1 << 2);
     (*SCB).aircr.set(reset);
 }
+
+#[repr(C)]
+struct ActlrRegisters {
+    actlr: VolatileCell<u32>,
+}
+
+const ACTLR_BASE: usize = 0xE000E008;
+
+static mut ACTLR: *mut ActlrRegisters = ACTLR_BASE as *mut ActlrRegisters;
+
+pub unsafe fn disable_write_buffering() {
+    let actlr = (*ACTLR).actlr.get();
+    (*ACTLR).actlr.set(actlr | 1 << 1);
+}
+

@@ -9,9 +9,8 @@ use capsules::virtual_alarm::VirtualMuxAlarm;
 use capsules::virtual_spi::MuxSpiMaster;
 use capsules::virtual_uart::{MuxUart, UartDevice};
 use kernel::capabilities;
+use kernel::component::Component;
 use kernel::hil;
-use kernel::hil::entropy::Entropy32;
-use kernel::hil::rng::Rng;
 use nrf5x::rtc::Rtc;
 
 use kernel::common::dynamic_deferred_call::{DynamicDeferredCall, DynamicDeferredCallClientState};
@@ -189,21 +188,9 @@ pub unsafe fn setup_board(
     );
     rtc.set_client(mux_alarm);
 
-    let virtual_alarm1 = static_init!(
-        capsules::virtual_alarm::VirtualMuxAlarm<'static, nrf5x::rtc::Rtc>,
-        capsules::virtual_alarm::VirtualMuxAlarm::new(mux_alarm)
-    );
-    let alarm = static_init!(
-        capsules::alarm::AlarmDriver<
-            'static,
-            capsules::virtual_alarm::VirtualMuxAlarm<'static, nrf5x::rtc::Rtc>,
-        >,
-        capsules::alarm::AlarmDriver::new(
-            virtual_alarm1,
-            board_kernel.create_grant(&memory_allocation_capability)
-        )
-    );
-    virtual_alarm1.set_client(alarm);
+    let alarm = components::alarm::AlarmDriverComponent::new(board_kernel, mux_alarm)
+        .finalize(components::alarm_component_helper!(nrf5x::rtc::Rtc));
+
     let ble_radio_virtual_alarm = static_init!(
         capsules::virtual_alarm::VirtualMuxAlarm<'static, nrf5x::rtc::Rtc>,
         capsules::virtual_alarm::VirtualMuxAlarm::new(mux_alarm)
@@ -295,20 +282,7 @@ pub unsafe fn setup_board(
     );
     kernel::hil::sensors::TemperatureDriver::set_client(&nrf5x::temperature::TEMP, temp);
 
-    let entropy_to_random = static_init!(
-        capsules::rng::Entropy32ToRandom<'static>,
-        capsules::rng::Entropy32ToRandom::new(&nrf5x::trng::TRNG)
-    );
-
-    let rng = static_init!(
-        capsules::rng::RngDriver<'static>,
-        capsules::rng::RngDriver::new(
-            entropy_to_random,
-            board_kernel.create_grant(&memory_allocation_capability)
-        )
-    );
-    nrf5x::trng::TRNG.set_client(entropy_to_random);
-    entropy_to_random.set_client(rng);
+    let rng = components::rng::RngComponent::new(board_kernel, &nrf5x::trng::TRNG).finalize(());
 
     // SPI
     let mux_spi = static_init!(

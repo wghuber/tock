@@ -27,9 +27,10 @@ impl LedComponent {
 }
 
 impl Component for LedComponent {
+    type StaticInput = ();
     type Output = &'static led::LED<'static, sam4l::gpio::GPIOPin>;
 
-    unsafe fn finalize(&mut self) -> Self::Output {
+    unsafe fn finalize(&mut self, _s: Self::StaticInput) -> Self::Output {
         let led_pins = static_init!(
             [(&'static sam4l::gpio::GPIOPin, led::ActivationMode); 1],
             [(&sam4l::gpio::PC[10], led::ActivationMode::ActiveHigh),]

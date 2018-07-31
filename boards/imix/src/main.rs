@@ -36,7 +36,7 @@ use components::crc::CrcComponent;
 use components::fxos8700::NineDofComponent;
 use components::gpio::GpioComponent;
 use components::isl29035::AmbientLightComponent;
-use components::led::LedComponent;
+use comp::led::LedComponent;
 use components::nonvolatile_storage::NonvolatileStorageComponent;
 use components::nrf51822::Nrf51822Component;
 use components::process_console::ProcessConsoleComponent;

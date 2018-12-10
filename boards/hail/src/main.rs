@@ -479,7 +479,8 @@ pub unsafe fn reset_handler() {
             adc_channels,
             &mut capsules::adc::ADC_BUFFER1,
             &mut capsules::adc::ADC_BUFFER2,
-            &mut capsules::adc::ADC_BUFFER3
+            &mut capsules::adc::ADC_BUFFER3,
+            board_kernel.create_grant(&memory_allocation_capability)
         )
     );
     sam4l::adc::ADC0.set_client(adc);

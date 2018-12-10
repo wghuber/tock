@@ -33,7 +33,7 @@ use core::cell::Cell;
 use core::cmp;
 use kernel::common::cells::{MapCell, OptionalCell, TakeCell};
 use kernel::hil;
-use kernel::{AppId, AppSlice, Callback, Driver, ReturnCode, Shared};
+use kernel::{AppId, AppSlice, Callback, Driver, Grant, ReturnCode, Shared};
 
 /// Syscall driver number.
 use driver;
@@ -47,11 +47,14 @@ pub struct Adc<'a, A: hil::adc::Adc + hil::adc::AdcHighSpeed> {
     channels: &'a [&'a <A as hil::adc::Adc>::Channel],
 
     // ADC state
+    active_app: OptionalCell<AppId>,
+
     active: Cell<bool>,
     mode: Cell<AdcMode>,
 
     // App state
     app: MapCell<App>,
+    apps: Grant<App>,
     channel: Cell<usize>,
     callback: OptionalCell<Callback>,
     app_buf_offset: Cell<usize>,
@@ -77,11 +80,29 @@ enum AdcMode {
     ContinuousBuffer = 3,
 }
 
+/// What action the app has requested. This action might be queued.
+#[derive(Copy, Clone, Debug, PartialEq)]
+enum AppAction {
+    SingleSample {channel: usize},
+    ContinuousSample {channel: usize},
+}
+
+#[derive(Copy, Clone, Debug, PartialEq)]
+enum BufferInUse {
+    Buffer1,
+    Buffer2,
+}
+
 /// Holds buffers that the application has passed us
 #[derive(Default)]
 pub struct App {
+    action: Option<AppAction>,
     app_buf1: Option<AppSlice<Shared, u8>>,
     app_buf2: Option<AppSlice<Shared, u8>>,
+    active_buffer: Option<BufferInUse>,
+    samples_remaining: usize,
+    samples_outstanding: usize,
+    callback: Option<Callback>,
 }
 
 /// Buffers to use for DMA transfers
@@ -106,6 +127,7 @@ impl<A: hil::adc::Adc + hil::adc::AdcHighSpeed> Adc<'a, A> {
         adc_buf1: &'static mut [u16; 128],
         adc_buf2: &'static mut [u16; 128],
         adc_buf3: &'static mut [u16; 128],
+        grant: Grant<App>,
     ) -> Adc<'a, A> {
         Adc {
             // ADC driver
@@ -113,11 +135,14 @@ impl<A: hil::adc::Adc + hil::adc::AdcHighSpeed> Adc<'a, A> {
             channels: channels,
 
             // ADC state
+            active_app: OptionalCell::empty(),
             active: Cell::new(false),
             mode: Cell::new(AdcMode::NoMode),
 
-            // App state
             app: MapCell::new(App::default()),
+
+            // App state
+            apps: grant,
             channel: Cell::new(0),
             callback: OptionalCell::empty(),
             app_buf_offset: Cell::new(0),
@@ -170,12 +195,13 @@ impl<A: hil::adc::Adc + hil::adc::AdcHighSpeed> Adc<'a, A> {
         }
     }
 
-    /// Collect a single analog sample on a channel
+    /// Collect a single analog sample on a channel.
     ///
-    /// channel - index into `channels` array, which channel to sample
-    fn sample(&self, channel: usize) -> ReturnCode {
-        // only one sample at a time
-        if self.active.get() {
+    /// - `channel` - index into `channels` array, which channel to sample
+    fn sample(&self, app_id: AppId, app: &mut App, channel: usize) -> ReturnCode {
+        // This app can only do one thing at a time. Check to see if it already
+        // has an action queued.
+        if app.action.is_some() {
             return ReturnCode::EBUSY;
         }
 
@@ -186,30 +212,37 @@ impl<A: hil::adc::Adc + hil::adc::AdcHighSpeed> Adc<'a, A> {
         let chan = self.channels[channel];
 
         // save state for callback
-        self.active.set(true);
-        self.mode.set(AdcMode::SingleSample);
-        self.channel.set(channel);
+        app.action = Some(AppAction::SingleSample { channel: channel});
+        // self.mode.set(AdcMode::SingleSample);
+        // self.channel.set(channel);
 
-        // start a single sample
-        let res = self.adc.sample(chan);
-        if res != ReturnCode::SUCCESS {
-            // failure, clear state
-            self.active.set(false);
-            self.mode.set(AdcMode::NoMode);
+        // Check to see if the ADC is free. If so, we can run this app's request
+        // immediately.
+        if self.active_app.is_none() {
+            self.active_app.set(app_id);
 
-            return res;
+            // start a single sample
+            let res = self.adc.sample(chan);
+            if res != ReturnCode::SUCCESS {
+                // failure, clear state
+                app.action = None;
+                self.active_app.clear();
+
+                return res;
+            }
         }
 
         ReturnCode::SUCCESS
     }
 
-    /// Collected repeated single analog samples on a channel
+    /// Collected repeated single analog samples on a channel.
     ///
-    /// channel - index into `channels` array, which channel to sample
-    /// frequency - number of samples per second to collect
-    fn sample_continuous(&self, channel: usize, frequency: u32) -> ReturnCode {
-        // only one sample at a time
-        if self.active.get() {
+    /// - `channel` - index into `channels` array, which channel to sample
+    /// - `frequency` - number of samples per second to collect
+    fn sample_continuous(&self, app_id: AppId, app: &mut App, channel: usize, frequency: u32) -> ReturnCode {
+        // This app can only do one thing at a time. Check to see if it already
+        // has an action queued.
+        if app.action.is_some() {
             return ReturnCode::EBUSY;
         }
 
@@ -220,32 +253,40 @@ impl<A: hil::adc::Adc + hil::adc::AdcHighSpeed> Adc<'a, A> {
         let chan = self.channels[channel];
 
         // save state for callback
-        self.active.set(true);
-        self.mode.set(AdcMode::ContinuousSample);
-        self.channel.set(channel);
+        app.action = Some(AppAction::ContinuousSample { channel: channel});
+        // self.active.set(true);
+        // self.mode.set(AdcMode::ContinuousSample);
+        // self.channel.set(channel);
 
-        // start a single sample
-        let res = self.adc.sample_continuous(chan, frequency);
-        if res != ReturnCode::SUCCESS {
-            // failure, clear state
-            self.active.set(false);
-            self.mode.set(AdcMode::NoMode);
+        // Check to see if the ADC is free. If so, we can run this app's request
+        // immediately.
+        if self.active_app.is_none() {
+            self.active_app.set(app_id);
 
-            return res;
+            // Do a single sample and start continuous sampling.
+            let res = self.adc.sample_continuous(chan, frequency);
+            if res != ReturnCode::SUCCESS {
+                // failure, clear state
+                app.action = None;
+                self.active_app.clear();
+
+                return res;
+            }
         }
 
         ReturnCode::SUCCESS
     }
 
-    /// Collect a buffer-full of analog samples
+    /// Collect a buffer-full of analog samples.
     /// Samples are collected into the first app buffer provided. The number of
-    /// samples collected is equal to the size of the buffer "allowed"
+    /// samples collected is equal to the size of the buffer "allowed".
     ///
-    /// channel - index into `channels` array, which channel to sample
-    /// frequency - number of samples per second to collect
-    fn sample_buffer(&self, channel: usize, frequency: u32) -> ReturnCode {
-        // only one sample at a time
-        if self.active.get() {
+    /// - `channel` - index into `channels` array, which channel to sample
+    /// - `frequency` - number of samples per second to collect
+    fn sample_buffer(&self, app_id: AppId, app: &mut App, channel: usize, frequency: u32) -> ReturnCode {
+        // This app can only do one thing at a time. Check to see if it already
+        // has an action queued.
+        if app.action.is_some() {
             return ReturnCode::EBUSY;
         }
 
@@ -256,67 +297,75 @@ impl<A: hil::adc::Adc + hil::adc::AdcHighSpeed> Adc<'a, A> {
         let chan = self.channels[channel];
 
         // cannot sample a buffer without a buffer to sample into
-        let mut app_buf_length = 0;
-        let exists = self.app.map_or(false, |state| {
-            app_buf_length = state.app_buf1.as_mut().map_or(0, |buf| buf.len());
-            state.app_buf1.is_some()
-        });
-        if !exists {
+        if app.app_buf1.is_none() {
             return ReturnCode::ENOMEM;
         }
+        let app_buf_length = app.app_buf1.as_ref().map_or(0, |buf| buf.len());
+        // let mut app_buf_length = 0;
+        // let exists = self.app.map_or(false, |state| {
+        //     app_buf_length = state.app_buf1.as_mut().map_or(0, |buf| buf.len());
+        //     state.app_buf1.is_some()
+        // });
+        // if !exists {
+        //     return ReturnCode::ENOMEM;
+        // }
 
         // save state for callback
-        self.active.set(true);
-        self.mode.set(AdcMode::SingleBuffer);
-        self.app_buf_offset.set(0);
-        self.channel.set(channel);
+        app.action = Some(AppAction::SingleBuffer { channel: channel, offset: 0});
+        // self.active.set(true);
+        // self.mode.set(AdcMode::SingleBuffer);
+        // self.app_buf_offset.set(0);
+        // self.channel.set(channel);
 
         // start a continuous sample
-        let res = self.adc_buf1.take().map_or(ReturnCode::EBUSY, |buf1| {
-            self.adc_buf2.take().map_or(ReturnCode::EBUSY, move |buf2| {
-                // determine request length
-                let request_len = app_buf_length / 2;
-                let len1;
-                let len2;
-                if request_len <= buf1.len() {
-                    len1 = app_buf_length / 2;
-                    len2 = 0;
-                } else if request_len <= (buf1.len() + buf2.len()) {
-                    len1 = buf1.len();
-                    len2 = request_len - buf1.len();
-                } else {
-                    len1 = buf1.len();
-                    len2 = buf2.len();
-                }
+        if self.active_app.is_none() {
+            self.active_app.set(app_id);
+            let res = app.adc_buf1.take().map_or(ReturnCode::EBUSY, |buf1| {
+                app.adc_buf2.take().map_or(ReturnCode::EBUSY, move |buf2| {
+                    // determine request length
+                    let request_len = app_buf_length / 2;
+                    let len1;
+                    let len2;
+                    if request_len <= buf1.len() {
+                        len1 = app_buf_length / 2;
+                        len2 = 0;
+                    } else if request_len <= (buf1.len() + buf2.len()) {
+                        len1 = buf1.len();
+                        len2 = request_len - buf1.len();
+                    } else {
+                        len1 = buf1.len();
+                        len2 = buf2.len();
+                    }
 
-                // begin sampling
-                self.using_app_buf1.set(true);
-                self.samples_remaining.set(request_len - len1 - len2);
-                self.samples_outstanding.set(len1 + len2);
-                let (rc, retbuf1, retbuf2) = self
-                    .adc
-                    .sample_highspeed(chan, frequency, buf1, len1, buf2, len2);
-                if rc != ReturnCode::SUCCESS {
-                    // store buffers again
-                    retbuf1.map(|buf| {
-                        self.replace_buffer(buf);
-                    });
-                    retbuf2.map(|buf| {
-                        self.replace_buffer(buf);
-                    });
-                }
-                rc
-            })
-        });
-        if res != ReturnCode::SUCCESS {
-            // failure, clear state
-            self.active.set(false);
-            self.mode.set(AdcMode::NoMode);
-            self.samples_remaining.set(0);
-            self.samples_outstanding.set(0);
+                    // begin sampling
+                    app.active_buffer = Some(BufferInUse::Buffer1);
+                    // app.using_app_buf1.set(true);
+                    app.samples_remaining.set(request_len - len1 - len2);
+                    app.samples_outstanding.set(len1 + len2);
+                    let (rc, retbuf1, retbuf2) = self
+                        .adc
+                        .sample_highspeed(chan, frequency, buf1, len1, buf2, len2);
+                    if rc != ReturnCode::SUCCESS {
+                        // store buffers again
+                        retbuf1.map(|buf| {
+                            self.replace_buffer(app, buf);
+                        });
+                        retbuf2.map(|buf| {
+                            self.replace_buffer(app, buf);
+                        });
+                    }
+                    rc
+                })
+            });
+            if res != ReturnCode::SUCCESS {
+                // failure, clear state
+                self.active.set(false);
+                self.mode.set(AdcMode::NoMode);
+                self.samples_remaining.set(0);
+                self.samples_outstanding.set(0);
 
-            return res;
-        }
+                return res;
+            }
 
         ReturnCode::SUCCESS
     }
@@ -328,7 +377,7 @@ impl<A: hil::adc::Adc + hil::adc::AdcHighSpeed> Adc<'a, A> {
     ///
     /// channel - index into `channels` array, which channel to sample
     /// frequency - number of samples per second to collect
-    fn sample_buffer_continuous(&self, channel: usize, frequency: u32) -> ReturnCode {
+    fn sample_buffer_continuous(&self, app_id: AppId, app: &mut App, channel: usize, frequency: u32) -> ReturnCode {
         // only one sample at a time
         if self.active.get() {
             return ReturnCode::EBUSY;
@@ -425,7 +474,7 @@ impl<A: hil::adc::Adc + hil::adc::AdcHighSpeed> Adc<'a, A> {
     /// Stops sampling the ADC
     /// Any active operation by the ADC is canceled. No additional callbacks
     /// will occur. Also retrieves buffers from the ADC (if any)
-    fn stop_sampling(&self) -> ReturnCode {
+    fn stop_sampling(&self, app_id: AppId, app: &mut App) -> ReturnCode {
         if !self.active.get() || self.mode.get() == AdcMode::NoMode {
             // already inactive!
             return ReturnCode::SUCCESS;
@@ -460,41 +509,79 @@ impl<A: hil::adc::Adc + hil::adc::AdcHighSpeed> Adc<'a, A> {
 
 /// Callbacks from the ADC driver
 impl<A: hil::adc::Adc + hil::adc::AdcHighSpeed> hil::adc::Client for Adc<'a, A> {
-    /// Single sample operation complete
-    /// Collects the sample and provides a callback to the application
+    /// Single sample operation complete.
+    /// Collects the sample and provides a callback to the application.
     ///
-    /// sample - analog sample value
+    /// - `sample` - analog sample value
     fn sample_ready(&self, sample: u16) {
-        if self.active.get() && self.mode.get() == AdcMode::SingleSample {
-            // single sample complete, clean up state
-            self.active.set(false);
-            self.mode.set(AdcMode::NoMode);
+        self.active_app.map(|active_app| {
+            self.apps.enter(*active_app, |app, _| {
+                if let Some(action) = app.action {
+                    match action {
+                        AppAction::SingleSample {channel} => {
+                            // This is a single sample so we can mark this app
+                            // as done at this point.
+                            app.action = None;
+                            self.active_app.clear();
 
-            // perform callback
-            self.callback.map(|callback| {
-                callback.schedule(
-                    AdcMode::SingleSample as usize,
-                    self.channel.get(),
-                    sample as usize,
-                );
+                            // Notify the app.
+                            app.callback.map(|mut callback| {
+                                callback.schedule(
+                                    AdcMode::SingleSample as usize,
+                                    channel,
+                                    sample as usize,
+                                );
+                            });
+                        }
+                        AppAction::ContinuousSample {channel} => {
+                            // We want to keep sampling, so do the callback
+                            // and leave the other state intact.
+                            self.callback.map(|callback| {
+                                callback.schedule(
+                                    AdcMode::ContinuousSample as usize,
+                                    channel,
+                                    sample as usize,
+                                );
+                            });
+                        }
+                    }
+                } else {
+                    // This shouldn't happen, but we need to at least mark
+                    // this app as not active.
+                    self.active_app.clear();
+                }
             });
-        } else if self.active.get() && self.mode.get() == AdcMode::ContinuousSample {
-            // sample ready in continuous sampling operation, keep state
+        });
+        // if self.active.get() && self.mode.get() == AdcMode::SingleSample {
+        //     // single sample complete, clean up state
+        //     self.active.set(false);
+        //     self.mode.set(AdcMode::NoMode);
 
-            // perform callback
-            self.callback.map(|callback| {
-                callback.schedule(
-                    AdcMode::ContinuousSample as usize,
-                    self.channel.get(),
-                    sample as usize,
-                );
-            });
-        } else {
-            // operation probably canceled. Make sure state is consistent. No
-            // callback
-            self.active.set(false);
-            self.mode.set(AdcMode::NoMode);
-        }
+        //     // perform callback
+        //     self.callback.map(|callback| {
+        //         callback.schedule(
+        //             AdcMode::SingleSample as usize,
+        //             self.channel.get(),
+        //             sample as usize,
+        //         );
+        //     });
+        // } else if self.active.get() && self.mode.get() == AdcMode::ContinuousSample {
+        //     // sample ready in continuous sampling operation, keep state
+
+        //     // perform callback
+        //     self.callback.map(|callback| {
+        //         callback.schedule(
+        //             AdcMode::ContinuousSample as usize,
+        //             self.channel.get(),
+        //             sample as usize,
+        //         );
+        //     });
+        // } else {
+        //     // operation probably canceled. Make sure state is consistent. No
+        //     // callback
+        //     self.active.set(false);
+        //     self.mode.set(AdcMode::NoMode);
+        // }
     }
 }
 
@@ -504,12 +591,12 @@ impl<A: hil::adc::Adc + hil::adc::AdcHighSpeed> hil::adc::HighSpeedClient for Ad
     /// Copies data over to application buffer, determines if more data is
     /// needed, and performs a callback to the application if ready. If
     /// continuously sampling, also swaps application buffers and continues
-    /// sampling when neccessary. If only filling a single buffer, stops
+    /// sampling when necessary. If only filling a single buffer, stops
     /// sampling operation when the application buffer is full.
     ///
-    /// buf - internal buffer filled with analog samples
-    /// length - number of valid samples in the buffer, guaranteed to be less
-    ///          than or equal to buffer length
+    /// - `buf` - internal buffer filled with analog samples
+    /// - `length` - number of valid samples in the buffer, guaranteed to be
+    ///   less than or equal to buffer length
     fn samples_ready(&self, buf: &'static mut [u16], length: usize) {
         // do we expect a buffer?
         if self.active.get()
@@ -758,36 +845,36 @@ impl<A: hil::adc::Adc + hil::adc::AdcHighSpeed> hil::adc::HighSpeedClient for Ad
 /// Implementations of application syscalls
 impl<A: hil::adc::Adc + hil::adc::AdcHighSpeed> Driver for Adc<'a, A> {
     /// Provides access to a buffer from the application to store data in or
-    /// read data from
+    /// read data from.
     ///
-    /// _appid - application identifier, unused
-    /// allow_num - which allow call this is
-    /// slice - representation of application memory to copy data into
+    /// ### `allow_num`
+    ///
+    /// - `0`: Share `app_buf1` to store samples in.
+    /// - `1`: Share a second buffer for double-buffered sampling.
     fn allow(
         &self,
-        _appid: AppId,
+        appid: AppId,
         allow_num: usize,
         slice: Option<AppSlice<Shared, u8>>,
     ) -> ReturnCode {
         match allow_num {
-            // Pass buffer for samples to go into
+            // Pass buffer for samples to go into.
             0 => {
                 // set first buffer
-                self.app.map(|state| {
-                    state.app_buf1 = slice;
-                });
-
-                ReturnCode::SUCCESS
+                self.apps.enter(appid, |app, _| {
+                    app.app_buf1 = slice;
+                    ReturnCode::SUCCESS
+                }).unwrap_or_else(|err| err.into())
             }
 
-            // Pass a second buffer to be used for double-buffered continuous sampling
+            // Pass a second buffer to be used for double-buffered continuous
+            // sampling.
             1 => {
                 // set second buffer
-                self.app.map(|state| {
-                    state.app_buf2 = slice;
-                });
-
-                ReturnCode::SUCCESS
+                self.apps.enter(appid, |app, _| {
+                    app.app_buf2 = slice;
+                    ReturnCode::SUCCESS
+                }).unwrap_or_else(|err| err.into())
             }
 
             // default
@@ -795,24 +882,25 @@ impl<A: hil::adc::Adc + hil::adc::AdcHighSpeed> Driver for Adc<'a, A> {
         }
     }
 
-    /// Provides a callback which can be used to signal the application
+    /// Provides a callback which can be used to signal the application.
     ///
-    /// subscribe_num - which subscribe call this is
-    /// callback - callback object which can be scheduled to signal the
-    ///            application
+    /// ### `subscribe_num`
+    ///
+    /// - `0`: Application callback for ADC done events.
     fn subscribe(
         &self,
         subscribe_num: usize,
         callback: Option<Callback>,
-        _app_id: AppId,
+        app_id: AppId,
     ) -> ReturnCode {
         match subscribe_num {
             // subscribe to ADC sample done (from all types of sampling)
-            0 => {
-                // set callback
-                self.callback.insert(callback);
-                ReturnCode::SUCCESS
-            }
+            0 => self
+                .apps
+                .enter(app_id, |app, _| {
+                    app.callback = callback;
+                    ReturnCode::SUCCESS
+                }).unwrap_or_else(|err| err.into()),
 
             // default
             _ => ReturnCode::ENOSUPPORT,
@@ -821,15 +909,20 @@ impl<A: hil::adc::Adc + hil::adc::AdcHighSpeed> Driver for Adc<'a, A> {
 
     /// Method for the application to command or query this driver
     ///
-    /// command_num - which command call this is
-    /// data - value sent by the application, varying uses
-    /// _appid - application identifier, unused
+    /// ### `command_num`
+    ///
+    /// - `0`: Driver check. Returns the number of channels.
+    /// - `1`: Start a single sample on a channel.
+    /// - `2`: Repeated single samples on a channel.
+    /// - `3`: Multiple sample on a channel.
+    /// - `4`: Continuous buffered sampling on a channel.
+    /// - `5`: Stop sampling.
     fn command(
         &self,
         command_num: usize,
         channel: usize,
         frequency: usize,
-        _appid: AppId,
+        appid: AppId,
     ) -> ReturnCode {
         match command_num {
             // check if present
@@ -838,19 +931,29 @@ impl<A: hil::adc::Adc + hil::adc::AdcHighSpeed> Driver for Adc<'a, A> {
             },
 
             // Single sample on channel
-            1 => self.sample(channel),
+            1 => self.apps.enter(appid, |app, _| {
+                    self.sample(appid, app, channel)
+                }).unwrap_or_else(|err| err.into()),
 
             // Repeated single samples on a channel
-            2 => self.sample_continuous(channel, frequency as u32),
+            2 => self.apps.enter(appid, |app, _| {
+                self.sample_continuous(appid, app, channel, frequency as u32)
+                }).unwrap_or_else(|err| err.into()),
 
             // Multiple sample on a channel
-            3 => self.sample_buffer(channel, frequency as u32),
+            3 => self.apps.enter(appid, |app, _| {
+                self.sample_buffer(appid, app, channel, frequency as u32)
+                }).unwrap_or_else(|err| err.into()),
 
             // Continuous buffered sampling on a channel
-            4 => self.sample_buffer_continuous(channel, frequency as u32),
+            4 => self.apps.enter(appid, |app, _| {
+                self.sample_buffer_continuous(appid, app, channel, frequency as u32)
+                }).unwrap_or_else(|err| err.into()),
 
             // Stop sampling
-            5 => self.stop_sampling(),
+            5 => self.apps.enter(appid, |app, _| {
+                self.stop_sampling(appid, app)
+                }).unwrap_or_else(|err| err.into()),
 
             // default
             _ => ReturnCode::ENOSUPPORT,

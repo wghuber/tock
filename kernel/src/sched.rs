@@ -16,6 +16,7 @@ use process::{self, Task};
 use returncode::ReturnCode;
 use syscall::{ContextSwitchReason, Syscall};
 
+
 /// The time a process is permitted to run before being pre-empted
 const KERNEL_TICK_DURATION_US: u32 = 10000;
 /// Skip re-scheduling a process if its quanta is nearly exhausted
@@ -209,6 +210,7 @@ impl Kernel {
     ) {
         loop {
             unsafe {
+                //debug_gpio!(0, toggle);
                 chip.service_pending_interrupts();
 
                 for p in self.processes.iter() {

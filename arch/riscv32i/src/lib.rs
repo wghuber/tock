@@ -3,12 +3,13 @@
 #![feature(asm, const_fn, lang_items, global_asm)]
 #![no_std]
 
-#[macro_use(register_bitfields, register_bitmasks)]
+#[macro_use(register_bitfields, register_bitmasks, debug_gpio, debug)]
 extern crate kernel;
 
 pub mod plic;
 pub mod support;
 pub mod syscall;
+pub mod clic;
 
 extern "C" {
     // External function defined by the board main.rs.

@@ -112,12 +112,12 @@ pub unsafe fn reset_handler() {
 
     let board_kernel = static_init!(kernel::Kernel, kernel::Kernel::new(&PROCESSES));
 
-    // // Configure kernel debug gpios as early as possible
-    // kernel::debug::assign_gpios(
-    //     Some(&arty_exx::gpio::PORT[0]), // Red
-    //     None,
-    //     None,
-    // );
+    // Configure kernel debug gpios as early as possible
+    kernel::debug::assign_gpios(
+        Some(&arty_exx::gpio::PORT[0]), // Red
+        None,
+        None,
+    );
 
     let chip = static_init!(arty_exx::chip::ArtyExx, arty_exx::chip::ArtyExx::new());
 
@@ -229,13 +229,14 @@ pub unsafe fn reset_handler() {
     }
 
     hil::gpio::Pin::make_output(&arty_exx::gpio::PORT[0]);
-    hil::gpio::Pin::set(&arty_exx::gpio::PORT[0]);
+    hil::gpio::Pin::clear(&arty_exx::gpio::PORT[0]);
 
     hil::gpio::Pin::make_output(&arty_exx::gpio::PORT[1]);
     hil::gpio::Pin::clear(&arty_exx::gpio::PORT[1]);
 
     hil::gpio::Pin::make_output(&arty_exx::gpio::PORT[2]);
-    hil::gpio::Pin::set(&arty_exx::gpio::PORT[2]);
+    hil::gpio::Pin::clear(&arty_exx::gpio::PORT[2]);
+
 
     let artye21 = ArtyE21 {
         // console: console,
@@ -268,9 +269,10 @@ pub unsafe fn reset_handler() {
     kernel::debug::set_debug_writer_wrapper(debug_wrapper);
 
     // arty_exx::uart::UART0.initialize_gpio_pins(&arty_exx::gpio::PORT[17], &arty_exx::gpio::PORT[16]);
-
+    
+    //debug_gpio!(0, toggle);
     debug!("Initialization complete. Entering main loop");
-
+    
     // testing some mret jump-around code
 
     // asm!("
@@ -290,14 +292,14 @@ pub unsafe fn reset_handler() {
         static _sapps: u8;
     }
 
-    kernel::procs::load_processes(
-        board_kernel,
-        chip,
-        &_sapps as *const u8,
-        &mut APP_MEMORY,
-        &mut PROCESSES,
-        FAULT_RESPONSE,
-        &process_mgmt_cap,
-    );
+    // kernel::procs::load_processes(
+    //     board_kernel,
+    //     chip,
+    //     &_sapps as *const u8,
+    //     &mut APP_MEMORY,
+    //     &mut PROCESSES,
+    //     FAULT_RESPONSE,
+    //     &process_mgmt_cap,
+    // );
     board_kernel.kernel_loop(&artye21, chip, None, &main_loop_cap);
 }

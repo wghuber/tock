@@ -96,7 +96,8 @@ pub unsafe fn reset_handler() {
 
     // THIS WORKED ON FE310, not on E21
     // E21 HAS CLIC, NOT PLIC
-    // riscv32i::enable_plic_interrupts();
+    riscv32i::enable_clic_interrupts();
+    //riscv::register::mtvec::write(0x305,0x2);
 
     let process_mgmt_cap = create_capability!(capabilities::ProcessManagementCapability);
     let main_loop_cap = create_capability!(capabilities::MainLoopCapability);
@@ -270,7 +271,7 @@ pub unsafe fn reset_handler() {
 
     // arty_exx::uart::UART0.initialize_gpio_pins(&arty_exx::gpio::PORT[17], &arty_exx::gpio::PORT[16]);
     
-    //debug_gpio!(0, toggle);
+    //debug_gpio!(0, set);
     debug!("Initialization complete. Entering main loop");
     
     // testing some mret jump-around code

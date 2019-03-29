@@ -36,8 +36,8 @@ struct IntPendRegisters {
     csip: [ReadWrite<u8, intpend::Register>; 1],
     _reserved3: [u8; 3],
     //Local Interrupt 0-127
-    localintpend: [ReadWrite<u8, intpend::Register>; 128],
-    _reserved4: [u8; 880]
+    localintpend: [ReadWrite<u8, intpend::Register>; 1008],
+    //_reserved4: [u8; 880]
 }
 
 //Interrupt Enable Registers
@@ -56,8 +56,8 @@ struct IntEnableRegisters {
     csip: [ReadWrite<u8, inten::Register>; 1],
     _reserved3: [u8; 3],
     //Local Interrupt 0-127
-    localint: [ReadWrite<u8, inten::Register>; 128],
-    _reserved4: [u8; 880]
+    localint: [ReadWrite<u8, inten::Register>; 1008],
+    //_reserved4: [u8; 880]
 }
 
 //Interrupt Configuration Registers
@@ -76,8 +76,8 @@ struct IntConfigRegisters {
     csip: [ReadWrite<u8, intcon::Register>; 1],
     _reserved3: [u8; 3],
     //Local Interrupt 0-127
-    localint: [ReadWrite<u8, intcon::Register>; 128],
-    _reserved4: [u8; 880]
+    localint: [ReadWrite<u8, intcon::Register>; 1008],
+    //_reserved4: [u8; 880]
 }
 
 //Configuration Register
@@ -96,8 +96,8 @@ struct ConfigRegisters {
     csip: [ReadWrite<u8, conreg::Register>; 1],
     _reserved3: [u8; 3],
     //Local Interrupt 0-127
-    localint: [ReadWrite<u8, conreg::Register>; 128],
-    _reserved4: [u8; 880]
+    localint: [ReadWrite<u8, conreg::Register>; 1008],
+    //_reserved4: [u8; 880]
 }
 
 
@@ -144,7 +144,7 @@ pub unsafe fn clear_all_pending() {
 pub unsafe fn enable_all() {
     let clic: &ClicRegisters = &*CLIC_BASE;
     for enable in clic.clicintie.localint.iter() {
-        enable.set(0xFFFF_FFFF);
+        enable.set(enable.get() | 0x01);
     }
 
     // Set some default priority for each interrupt. This is not really used
@@ -172,9 +172,8 @@ pub unsafe fn next_pending() -> Option<u32> {
     let mut i = 0;
     for pending in clic.clicintip.localintpend.iter() {
             i += 1;
-            if pending.get() = 0x00 {
-                debug!("{}", pending.get());
-                debug_gpio!(0, set);
+            if pending.get() != 0x10 {
+                //debug_gpio!(0, set);
                 return Some(i);
         }
     }

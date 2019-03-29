@@ -6,7 +6,8 @@
 #[macro_use(register_bitfields, register_bitmasks, debug_gpio, debug)]
 extern crate kernel;
 
-pub mod plic;
+
+//pub mod plic;
 pub mod support;
 pub mod syscall;
 pub mod clic;
@@ -111,26 +112,28 @@ pub unsafe fn init_memory() {
 /// The trap handler is called on exceptions and for interrupts.
 pub unsafe fn configure_trap_handler() {
     asm!("
-		// The csrw instruction writes a Control and Status Register (CSR)
-		// with a new value.
-		//
-		// CSR 0x305 (mtvec, 'Machine trap-handler base address.') sets the address
+    // The csrw instruction writes a Control and Status Register (CSR)
+    // with a new value.
+    //
+    // CSR 0x305 (mtvec, 'Machine trap-handler base address.') sets the address
     // of the trap handler. We do not care about its old value, so we don't
     // bother reading it.
-		csrw 0x305, $0
-		"
-	     :
-	     : "r"(&_start_trap)
-	     :
-	     : "volatile");
+    csrw 0x305, $0
+    "
+       :
+       : "r"(&_start_trap | 0x02)
+       :
+       : "volatile");
 }
+
 
 /// Enable all PLIC interrupts so that individual peripheral drivers do not have
 /// to manage these.
-pub unsafe fn enable_plic_interrupts() {
-    plic::disable_all();
-    plic::clear_all_pending();
-    plic::enable_all();
+pub unsafe fn enable_clic_interrupts() {
+    
+    clic::disable_all();
+    clic::clear_all_pending();
+    clic::enable_all();
 }
 
 /// Trap entry point (_start_trap)
@@ -197,6 +200,7 @@ _start_trap:
 // #[link_section = ".trap.rust"]
 #[export_name = "_start_trap_rust"]
 pub extern "C" fn start_trap_rust() {
+    while(true){};
     // // dispatch trap to handler
     // trap_handler(mcause::read().cause());
     // // mstatus, remain in M-mode after mret

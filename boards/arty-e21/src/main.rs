@@ -96,7 +96,8 @@ pub unsafe fn reset_handler() {
 
     // THIS WORKED ON FE310, not on E21
     // E21 HAS CLIC, NOT PLIC
-    riscv32i::enable_clic_interrupts();
+    // riscv32i::enable_clic_interrupts();
+
     //riscv::register::mtvec::write(0x305,0x2);
 
     let process_mgmt_cap = create_capability!(capabilities::ProcessManagementCapability);
@@ -116,9 +117,11 @@ pub unsafe fn reset_handler() {
     // Configure kernel debug gpios as early as possible
     kernel::debug::assign_gpios(
         Some(&arty_exx::gpio::PORT[0]), // Red
-        None,
-        None,
+        Some(&arty_exx::gpio::PORT[1]),
+        Some(&arty_exx::gpio::PORT[8]),
     );
+
+
 
     let chip = static_init!(arty_exx::chip::ArtyExx, arty_exx::chip::ArtyExx::new());
 
@@ -238,6 +241,18 @@ pub unsafe fn reset_handler() {
     hil::gpio::Pin::make_output(&arty_exx::gpio::PORT[2]);
     hil::gpio::Pin::clear(&arty_exx::gpio::PORT[2]);
 
+    hil::gpio::Pin::make_output(&arty_exx::gpio::PORT[8]);
+    hil::gpio::Pin::clear(&arty_exx::gpio::PORT[8]);
+
+
+// riscv32i::enable_clic_interrupts();
+
+debug_gpio!(0, set);
+
+riscv32i::enable_clic_interrupts();
+
+
+
 
     let artye21 = ArtyE21 {
         // console: console,
@@ -270,10 +285,13 @@ pub unsafe fn reset_handler() {
     kernel::debug::set_debug_writer_wrapper(debug_wrapper);
 
     // arty_exx::uart::UART0.initialize_gpio_pins(&arty_exx::gpio::PORT[17], &arty_exx::gpio::PORT[16]);
-    
+
     //debug_gpio!(0, set);
-    debug!("Initialization complete. Entering main loop");
-    
+    debug!("gInitialization complete. Entering main loop and does this matter at all");
+    debug!("TTTInitializhave some more cool content here ok lets do it");
+
+
+
     // testing some mret jump-around code
 
     // asm!("

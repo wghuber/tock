@@ -122,6 +122,7 @@ pub unsafe fn configure_trap_handler() {
     "
        :
        : "r"(&_start_trap | 0x02)
+       // : "r"(&_start_trap)
        :
        : "volatile");
 }
@@ -130,10 +131,29 @@ pub unsafe fn configure_trap_handler() {
 /// Enable all PLIC interrupts so that individual peripheral drivers do not have
 /// to manage these.
 pub unsafe fn enable_clic_interrupts() {
-    
+
     clic::disable_all();
     clic::clear_all_pending();
     clic::enable_all();
+
+    // let m: u32;
+    // let METAL_MIE_INTERRUPT: u32 = 0x00000008;
+
+    // asm! ("csrrs %0, mstatus, %1" : "=r"(m) : "r"(METAL_MIE_INTERRUPT));
+
+
+
+
+
+    // enable machine mode interrupts
+    asm! ("
+      // CSR 0x300 mstatus
+      csrw 0x300, $0
+      "
+      :
+      : "r"(0x00000008)
+      :
+      : "volatile");
 }
 
 /// Trap entry point (_start_trap)
@@ -144,7 +164,8 @@ pub unsafe fn enable_clic_interrupts() {
 global_asm!(
     r#"
   .section .riscv.trap, "ax"
-  .align 4
+  .align 6
+  //.p2align 6
   .global _start_trap
 
 _start_trap:
@@ -191,6 +212,23 @@ _start_trap:
 "#
 );
 
+
+// /// Trap entry point (_start_trap)
+// ///
+// /// Saves caller saved registers ra, t0..6, a0..7, calls _start_trap_rust,
+// /// restores caller saved registers and then returns.
+// #[cfg(any(target_arch = "riscv32", target_arch = "riscv64"))]
+// global_asm!(
+//     r#"
+//   .section .riscv.trap, "ax"
+//   .p2align 6
+//   .global _start_trap
+
+// _start_trap:
+//   mret
+// "#
+// );
+
 /// Trap entry point rust (_start_trap_rust)
 ///
 /// mcause is read to determine the cause of the trap. XLEN-1 bit indicates
@@ -200,7 +238,8 @@ _start_trap:
 // #[link_section = ".trap.rust"]
 #[export_name = "_start_trap_rust"]
 pub extern "C" fn start_trap_rust() {
-    while(true){};
+  debug_gpio!(1, set);
+    // while(true){};
     // // dispatch trap to handler
     // trap_handler(mcause::read().cause());
     // // mstatus, remain in M-mode after mret

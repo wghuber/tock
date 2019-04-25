@@ -121,7 +121,8 @@ pub unsafe fn configure_trap_handler() {
     csrw 0x305, $0
     "
        :
-       : "r"(&_start_trap | 0x02)
+       // : "r"((&_start_trap) | 0x02)
+       : "r"(0x40400042)
        // : "r"(&_start_trap)
        :
        : "volatile");
@@ -144,6 +145,16 @@ pub unsafe fn enable_clic_interrupts() {
 
 
 
+
+    // // enable mie 1
+    // asm! ("
+    //   // CSR 0x304 mie
+    //   csrw 0x304, $0
+    //   "
+    //   :
+    //   : "r"(0x00000001)
+    //   :
+    //   : "volatile");
 
     // enable machine mode interrupts
     asm! ("
@@ -238,7 +249,9 @@ _start_trap:
 // #[link_section = ".trap.rust"]
 #[export_name = "_start_trap_rust"]
 pub extern "C" fn start_trap_rust() {
-  debug_gpio!(1, set);
+  // debug_gpio!(1, toggle);
+  debug_gpio!(2, toggle);
+  unsafe {clic::disable_mtip();}
     // while(true){};
     // // dispatch trap to handler
     // trap_handler(mcause::read().cause());
@@ -246,6 +259,17 @@ pub extern "C" fn start_trap_rust() {
     // unsafe {
     //     mstatus::set_mpp(mstatus::MPP::Machine);
     // }
+
+    unsafe{
+    asm! ("
+      // CSR 0x300 mstatus
+      csrw 0x300, $0
+      "
+      :
+      : "r"(0x00001808)
+      :
+      : "volatile");
+  }
 }
 
 // Make sure there is an abort when linking.

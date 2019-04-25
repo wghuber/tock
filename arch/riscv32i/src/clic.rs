@@ -147,6 +147,20 @@ pub unsafe fn clear_all_pending() {
     }
 }
 
+pub unsafe fn disable_mtip() {
+    let clic: &ClicRegisters = &*CLIC_BASE;
+
+    clic.clicintie.mtip.write(inten::IntEn::CLEAR);
+
+
+    // clic.clicintie.localint[4].write(inten::IntEn::CLEAR);
+    clic.clicintie.localint[4].set(0);
+
+    // if clic.clicintip.localintpend[4].get() != 0 {
+    //     debug_gpio!(1, set);
+    // }
+}
+
 /// Enable all interrupts.
 pub unsafe fn enable_all() {
     let clic: &ClicRegisters = &*CLIC_BASE;
@@ -154,7 +168,7 @@ pub unsafe fn enable_all() {
 
 
     clic.clicintie.msip.write(inten::IntEn::SET);
-    clic.clicintie.mtip.write(inten::IntEn::SET);
+    // clic.clicintie.mtip.write(inten::IntEn::SET);
     clic.clicintie.meip.write(inten::IntEn::SET);
     clic.clicintie.csip.write(inten::IntEn::SET);
 
@@ -229,23 +243,28 @@ pub unsafe fn next_pending() -> Option<u32> {
     //
 
 
-    if clic.clicintip.msip.is_set(intpend::IntPend) {
-        return Some(3);
-    }
-    if clic.clicintip.mtip.is_set(intpend::IntPend) {
-        return Some(7);
-    }
-    if clic.clicintip.meip.is_set(intpend::IntPend) {
-        return Some(11);
-    }
-    if clic.clicintip.csip.is_set(intpend::IntPend) {
-        return Some(12);
-    }
+    // if clic.clicintip.msip.is_set(intpend::IntPend) {
+    //     return Some(3);
+    // }
+    // if clic.clicintip.mtip.is_set(intpend::IntPend) {
+    //     return Some(7);
+    // }
+    // if clic.clicintip.meip.is_set(intpend::IntPend) {
+    //     return Some(11);
+    // }
+    // if clic.clicintip.csip.is_set(intpend::IntPend) {
+    //     return Some(12);
+    // }
 
     for (i, pending) in clic.clicintip.localintpend.iter().enumerate() {
             // i += 1;
             // if pending.get() != 0x10 {
             if pending.is_set(intpend::IntPend) {
+                // if i == 4 {
+                //     debug_gpio!(1, set);
+                // }
+
+
                 //debug_gpio!(0, set);
                 return Some((i+16) as u32);
         }
@@ -263,8 +282,9 @@ pub unsafe fn complete(index: u32) {
         7 => clic.clicintip.mtip.write(intpend::IntPend::CLEAR),
         11 => clic.clicintip.meip.write(intpend::IntPend::CLEAR),
         12 => clic.clicintip.csip.write(intpend::IntPend::CLEAR),
-        16...128 => {
-            clic.clicintip.localintpend[(index as usize) - 16].write(intpend::IntPend::CLEAR);
+        16...144 => {
+            // clic.clicintip.localintpend[(index as usize) - 16].write(intpend::IntPend::CLEAR);
+            clic.clicintip.localintpend[(index as usize) - 16].set(0);
         },
         _ => {}
     }

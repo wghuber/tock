@@ -39,18 +39,32 @@ impl kernel::Chip for ArtyExx {
     fn service_pending_interrupts(&self) {
         unsafe {
 
+            // debug_gpio!(2, toggle);
+
             while let Some(interrupt) = clic::next_pending() {
-                // debug_gpio!(0, set);
+                // if interrupt == 20 {
+                //     debug_gpio!(2, toggle);
+                // }
+                // if interrupt == 11 {
+                //     debug_gpio!(0, set);
+                // }
+                if interrupt == 16 {
+                    debug_gpio!(0, set);
+                }
+                if interrupt == 20 {
+                    debug_gpio!(1, set);
+                }
                 // if interrupt < 7 || interrupt > 8 {
-                if interrupt >= 12 {
+                if interrupt == 32 {
+                    // debug_gpio!(2, toggle);
                 // if interrupt > 8 {
                     // debug_gpio!(0, toggle);
-                    debug_gpio!(2, toggle);
-                    debug_gpio!(2, toggle);
-                    debug_gpio!(2, toggle);
-                    debug_gpio!(2, toggle);
-                uart::UART0.handle_interrupt();
-            }
+                    // debug_gpio!(2, toggle);
+                    // debug_gpio!(2, toggle);
+                    // debug_gpio!(2, toggle);
+                    // debug_gpio!(2, toggle);
+                    uart::UART0.handle_interrupt();
+                }
                 // match interrupt {
 
                 //     // interrupts::UART0 => uart::UART0.handle_interrupt(),

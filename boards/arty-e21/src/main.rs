@@ -219,7 +219,7 @@ pub unsafe fn reset_handler() {
     let gpio_pins = static_init!(
         [&'static sifive::gpio::GpioPin; 3],
         [
-            &arty_exx::gpio::PORT[4],
+            &arty_exx::gpio::PORT[7],
             &arty_exx::gpio::PORT[5],
             &arty_exx::gpio::PORT[6],
         ]
@@ -244,10 +244,19 @@ pub unsafe fn reset_handler() {
     hil::gpio::Pin::make_output(&arty_exx::gpio::PORT[8]);
     hil::gpio::Pin::clear(&arty_exx::gpio::PORT[8]);
 
+    hil::gpio::Pin::make_input(&arty_exx::gpio::PORT[4]);
+    hil::gpio::Pin::enable_interrupt(&arty_exx::gpio::PORT[4], 0, hil::gpio::InterruptMode::RisingEdge);
+
+    hil::gpio::Pin::make_input(&arty_exx::gpio::PORT[3]);
+    hil::gpio::Pin::enable_interrupt(&arty_exx::gpio::PORT[3], 0, hil::gpio::InterruptMode::RisingEdge);
+    // hil::gpio::Pin::make_input(&arty_exx::gpio::PORT[16]);
+    // hil::gpio::Pin::enable_interrupt(&arty_exx::gpio::PORT[16], 0, hil::gpio::InterruptMode::RisingEdge);
+    // hil::gpio::Pin::clear(&arty_exx::gpio::PORT[8]);
+
 
 // riscv32i::enable_clic_interrupts();
 
-debug_gpio!(0, set);
+// debug_gpio!(0, set);
 
 riscv32i::enable_clic_interrupts();
 
@@ -287,7 +296,7 @@ riscv32i::enable_clic_interrupts();
     // arty_exx::uart::UART0.initialize_gpio_pins(&arty_exx::gpio::PORT[17], &arty_exx::gpio::PORT[16]);
 
     //debug_gpio!(0, set);
-    debug!("gInitialization complete. Entering main loop and does this matter at all");
+    debug!("hInitialization complete. Entering main loop and does this matter at all");
     debug!("TTTInitializhave some more cool content here ok lets do it");
 
 

@@ -15,7 +15,7 @@ flash: target/$(TARGET)/release/$(PLATFORM).bin
 		-c "init; jtagspi_init 0 bscan_spi_xc7a35t.bit; jtagspi_program $< 0x400000; shutdown"
 
 
-flash-e21: sifive_coreip_E21_FPGA_Evaluation_v1p0_rc2.mcs
+flash-e21: sifive_coreip_E21_FPGA_Evaluation_v19_02_rc0.mcs
 	openocd -f arty-openocd-digilent.cfg \
 		-c "init; jtagspi_init 0 bscan_spi_xc7a35t.bit; jtagspi_program $< 0x0; shutdown"
 

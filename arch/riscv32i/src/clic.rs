@@ -3,10 +3,6 @@
 use kernel::common::registers::{self, ReadOnly, ReadWrite, WriteOnly};
 use kernel::common::StaticRef;
 
-// use kernel::debug;
-// use kernel::gpio;
-
-
 
 //CLIC Hart Specific Region
 #[repr(C)]
@@ -41,11 +37,6 @@ struct IntPendRegisters {
     localintpend: [ReadWrite<u8, intpend::Register>; 128],
     // localintpend: [ReadWrite<u8, intpend::Register>; 1008],
     _reserved4: [u8; 880]
-
-
-
-
-    // localintpend: [ReadWrite<u8, intpend::Register>; 1024],
 }
 
 //Interrupt Enable Registers
@@ -68,9 +59,6 @@ struct IntEnableRegisters {
     localint: [ReadWrite<u8, inten::Register>; 128],
     // localint: [ReadWrite<u8, inten::Register>; 1008],
     _reserved4: [u8; 880]
-
-
-    // localint: [ReadWrite<u8, inten::Register>; 1024],
 }
 
 //Interrupt Configuration Registers
@@ -91,7 +79,7 @@ struct IntConfigRegisters {
     _reserved3: [u8; 3],
     //Local Interrupt 0-127
     localint: [ReadWrite<u8, intcon::Register>; 1008],
-    //_reserved4: [u8; 880]
+    _reserved4: [u8; 880]
 }
 
 //Configuration Register
@@ -142,23 +130,15 @@ pub unsafe fn clear_all_pending() {
     clic.clicintip.csip.write(intpend::IntPend::CLEAR);
 
     for pending in clic.clicintip.localintpend.iter() {
-        pending.set(0);
-        // pending.write(intpend::IntPend::CLEAR);
+        pending.write(intpend::IntPend::CLEAR);
     }
 }
 
+// Disable machine timer interrupt
 pub unsafe fn disable_mtip() {
     let clic: &ClicRegisters = &*CLIC_BASE;
 
     clic.clicintie.mtip.write(inten::IntEn::CLEAR);
-
-
-    // clic.clicintie.localint[4].write(inten::IntEn::CLEAR);
-    clic.clicintie.localint[4].set(0);
-
-    // if clic.clicintip.localintpend[4].get() != 0 {
-    //     debug_gpio!(1, set);
-    // }
 }
 
 /// Enable all interrupts.
@@ -166,63 +146,20 @@ pub unsafe fn enable_all() {
     let clic: &ClicRegisters = &*CLIC_BASE;
 
 
-
     clic.clicintie.msip.write(inten::IntEn::SET);
-    // clic.clicintie.mtip.write(inten::IntEn::SET);
+    clic.clicintie.mtip.write(inten::IntEn::SET);
     clic.clicintie.meip.write(inten::IntEn::SET);
     clic.clicintie.csip.write(inten::IntEn::SET);
 
 
     for (i,enable) in clic.clicintie.localint.iter().enumerate() {
-        // enable.set(enable.get() | 0x01);
-        // enable.write(inten::IntEn::SET);
-        // enable.write(inten::IntEn::CLEAR);
-
-        // if i != 0 {
-            enable.set(1);
-        // }
+            enable.write(inten::IntEn::SET);
     }
-
-
-
-
-
-
-
-
-
-    // debug_gpio!(0, set);
-
-    // Set some default priority for each interrupt. This is not really used
-    // at this point.
-    //for priority in clic.priority.iter() {
-    //    priority.write(priority::Priority.val(4));
-    //}
-
-    // Accept all interrupts.
-    //clic.threshold.write(priority::Priority.val(0));
-
-    // clic.clicintip.csip.write(intpend::IntPend::SET);
-
-
-    // clic.clicintip.localintpend[32].set(1);
-    // clic.clicintip.localintpend[12].set(1);
-
-
-    // if clic.clicintip.localintpend[12].get() != 0 {
-
-
-    // // if clic.clicintie.localint[12].get() != 0 {
-    //     debug_gpio!(1, set);
-    // }
-    // debug_gpio!(1, set);
 }
 
 /// Disable all interrupts.
 pub unsafe fn disable_all() {
     let clic: &ClicRegisters = &*CLIC_BASE;
-
-
 
     clic.clicintie.msip.write(inten::IntEn::CLEAR);
     clic.clicintie.mtip.write(inten::IntEn::CLEAR);
@@ -230,7 +167,6 @@ pub unsafe fn disable_all() {
     clic.clicintie.csip.write(inten::IntEn::CLEAR);
 
     for enable in clic.clicintie.localint.iter() {
-        // enable.set(0);
         enable.write(inten::IntEn::CLEAR);
     }
 }
@@ -239,33 +175,9 @@ pub unsafe fn disable_all() {
 /// none is pending.
 pub unsafe fn next_pending() -> Option<u32> {
     let clic: &ClicRegisters = &*CLIC_BASE;
-    // let mut i = 0;
-    //
-
-
-    // if clic.clicintip.msip.is_set(intpend::IntPend) {
-    //     return Some(3);
-    // }
-    // if clic.clicintip.mtip.is_set(intpend::IntPend) {
-    //     return Some(7);
-    // }
-    // if clic.clicintip.meip.is_set(intpend::IntPend) {
-    //     return Some(11);
-    // }
-    // if clic.clicintip.csip.is_set(intpend::IntPend) {
-    //     return Some(12);
-    // }
 
     for (i, pending) in clic.clicintip.localintpend.iter().enumerate() {
-            // i += 1;
-            // if pending.get() != 0x10 {
             if pending.is_set(intpend::IntPend) {
-                // if i == 4 {
-                //     debug_gpio!(1, set);
-                // }
-
-
-                //debug_gpio!(0, set);
                 return Some((i+16) as u32);
         }
     }
@@ -283,33 +195,10 @@ pub unsafe fn complete(index: u32) {
         11 => clic.clicintip.meip.write(intpend::IntPend::CLEAR),
         12 => clic.clicintip.csip.write(intpend::IntPend::CLEAR),
         16...144 => {
-            // clic.clicintip.localintpend[(index as usize) - 16].write(intpend::IntPend::CLEAR);
-            clic.clicintip.localintpend[(index as usize) - 16].set(0);
+            clic.clicintip.localintpend[(index as usize) - 16].write(intpend::IntPend::CLEAR);
         },
         _ => {}
     }
-
-    // if index < 16 {
-
-    //     if index == 12 {
-    //         clic.clicintip.csip.write(intpend::IntPend::CLEAR);
-    //     }
-
-    //     if index == 12 {
-    //         clic.clicintip.csip.write(intpend::IntPend::CLEAR);
-    //     }
-
-    // } else {
-
-    //     clic.clicintip.localintpend[(index as usize) - 16].write(intpend::IntPend::CLEAR);
-
-    // }
-
-    // for (i, pending) in clic.clicintip.localintpend.iter().enumerate() {
-    //     if i == (index as usize){
-    //         pending.set(0);
-    //     }
-    // }
 }
 
 /// Return `true` if there are any pending interrupts in the CLIC, `false`
@@ -333,3 +222,4 @@ pub unsafe fn has_pending() -> bool {
 
     // clic.clicintip.localintpend.iter().fold(0, |i, localintpend| localintpend.get() | i) != 0
 }
+

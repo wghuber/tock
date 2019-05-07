@@ -252,6 +252,7 @@ pub extern "C" fn start_trap_rust() {
   // debug_gpio!(1, toggle);
   debug_gpio!(2, toggle);
   unsafe {clic::disable_mtip();}
+  unsafe {clic::disable_pending();}
     // while(true){};
     // // dispatch trap to handler
     // trap_handler(mcause::read().cause());

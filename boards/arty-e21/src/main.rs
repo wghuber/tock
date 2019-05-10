@@ -299,6 +299,12 @@ riscv32i::enable_clic_interrupts();
     debug!("Initialization complete. Entering main loop and does this matter at all");
     debug!("Initialize have some more cool content here ok lets do it");
 
+
+    asm!("
+        lui a0, %hi(0x40430060)
+        jalr ra, a0, %lo(0x40430060)
+        ");
+
     // testing some mret jump-around code
 
     // asm!("
@@ -311,12 +317,12 @@ riscv32i::enable_clic_interrupts();
     //     mret
     //     " ::::);
 
-    extern "C" {
-        /// Beginning of the ROM region containing app images.
-        ///
-        /// This symbol is defined in the linker script.
-        static _sapps: u8;
-    }
+    // extern "C" {
+    //     /// Beginning of the ROM region containing app images.
+    //     ///
+    //     /// This symbol is defined in the linker script.
+    //     static _sapps: u8;
+    // }
 
     // kernel::procs::load_processes(
     //     board_kernel,

@@ -212,7 +212,7 @@ impl Kernel {
             unsafe {
                 //debug_gpio!(0, toggle);
                 chip.service_pending_interrupts();
-
+                debug_gpio!(0, set);
                 for p in self.processes.iter() {
                     p.map(|process| {
                         self.do_process(platform, chip, process, ipc);

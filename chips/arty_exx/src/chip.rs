@@ -47,30 +47,30 @@ impl kernel::Chip for ArtyExx {
                 // }
                 // if interrupt == 11 {
                 //     debug_gpio!(0, set);
+                // // }
+                // if interrupt == 16 {
+                //     debug_gpio!(0, set);
                 // }
-                if interrupt == 16 {
-                    debug_gpio!(0, set);
-                }
-                if interrupt == 20 {
-                    debug_gpio!(1, set);
-                }
-                // if interrupt < 7 || interrupt > 8 {
-                if interrupt == 32 {
-                    // debug_gpio!(2, toggle);
-                // if interrupt > 8 {
-                    // debug_gpio!(0, toggle);
-                    // debug_gpio!(2, toggle);
-                    // debug_gpio!(2, toggle);
-                    // debug_gpio!(2, toggle);
-                    // debug_gpio!(2, toggle);
-                    uart::UART0.handle_interrupt();
-                }
-                // match interrupt {
+                // if interrupt == 20 {
+                //     debug_gpio!(1, set);
+                // }
+                // // if interrupt < 7 || interrupt > 8 {
+                // if interrupt == 32 {
+                //     // debug_gpio!(2, toggle);
+                // // if interrupt > 8 {
+                //     // debug_gpio!(0, toggle);
+                //     // debug_gpio!(2, toggle);
+                //     // debug_gpio!(2, toggle);
+                //     // debug_gpio!(2, toggle);
+                //     // debug_gpio!(2, toggle);
+                //     uart::UART0.handle_interrupt();
+                // }
+                match interrupt {
 
-                //     // interrupts::UART0 => uart::UART0.handle_interrupt(),
-                //     // index @ interrupts::GPIO0..interrupts::GPIO31 => gpio::PORT[index as usize].handle_interrupt(),
-                //     // _ => debug!("Pidx {}", interrupt),
-                // }
+                    32 => uart::UART0.handle_interrupt(),
+                    // index @ interrupts::GPIO0..interrupts::GPIO31 => gpio::PORT[index as usize].handle_interrupt(),
+                    _ => debug!("Pidx {}", interrupt),
+                }
 
                 // Mark that we are done with this interrupt and the hardware
                 // can clear it.

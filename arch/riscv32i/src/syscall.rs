@@ -48,7 +48,7 @@ impl kernel::syscall::UserspaceKernelBoundary for SysCall {
         &self,
         stack_pointer: *const usize,
         _state: &mut RiscvimacStoredState,
-    ) -> *mut usize {
+        ) -> *mut usize {
         stack_pointer as *mut usize
     }
 
@@ -58,19 +58,52 @@ impl kernel::syscall::UserspaceKernelBoundary for SysCall {
         _remaining_stack_memory: usize,
         _callback: kernel::procs::FunctionCall,
         _state: &RiscvimacStoredState,
-    ) -> Result<*mut usize, *mut usize> {
-        Err(stack_pointer as *mut usize)
+        ) -> Result<*mut usize, *mut usize> {
+
+        Ok(stack_pointer as *mut usize)
     }
 
     unsafe fn switch_to_process(
         &self,
         stack_pointer: *const usize,
         _state: &mut RiscvimacStoredState,
-    ) -> (*mut usize, kernel::syscall::ContextSwitchReason) {
+        ) -> (*mut usize, kernel::syscall::ContextSwitchReason) {
+        
+        let mut mstatus: u32;
+
+        unsafe{
+            asm! ("
+              // CSR 0x300 mstatus
+              csrr t3, 0x300
+              "
+              : "=r" (mstatus)
+              : 
+              :
+              : "volatile");
+        }
+
+        mstatus = (mstatus  &! 0x00000100 &! 0x00000002) | 0x00000020;
+
+        unsafe{
+            asm! ("
+              csrw 0x300, $0
+              csrw 0x341, $1
+              add x2, x0, $2
+              li a0, 0x00000005
+              li a1, 0x00000006
+              li a2, 0x00000007
+              li a3, 0x00000008
+              mret
+              "
+              : 
+              : "r"(mstatus), "r"(0x40430060), "r"(stack_pointer)
+              : "a0", "a1", "a2", "a3"
+              : "volatile");
+        }    
         (
             stack_pointer as *mut usize,
             kernel::syscall::ContextSwitchReason::Fault,
-        )
+            )
     }
 
     unsafe fn fault_fmt(&self, writer: &mut Write) {}
@@ -80,6 +113,6 @@ impl kernel::syscall::UserspaceKernelBoundary for SysCall {
         stack_pointer: *const usize,
         state: &RiscvimacStoredState,
         writer: &mut Write,
-    ) {
+        ) {
     }
 }

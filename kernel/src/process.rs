@@ -62,6 +62,7 @@ pub fn load_processes<C: Chip>(
                 }
             } else {
                 procs[i] = process;
+                debug!("PC");
             }
 
             apps_in_flash_ptr = apps_in_flash_ptr.offset(flash_offset as isize);
@@ -1178,13 +1179,14 @@ impl<C: 'static + Chip> Process<'a, C> {
                 timeslice_expiration_count: 0,
             });
 
-            if (init_fn & 0x1) != 1 {
-                panic!(
-                    "{:?} process image invalid. \
-                     init_fn address must end in 1 to be Thumb, got {:#X}",
-                    process_name, init_fn
-                );
-            }
+            // if (init_fn & 0x1) != 1 {
+            //     debug_gpio!(0, set);
+            //     panic!(
+            //         "{:?} process image invalid. \
+            //          init_fn address must end in 1 to be Thumb, got {:#X}",
+            //         process_name, init_fn
+            //     );
+            // }
 
             let flash_protected_size = process.header.get_protected_size() as usize;
             let flash_app_start = app_flash_address as usize + flash_protected_size;

@@ -155,6 +155,7 @@ pub unsafe fn enable_all() {
     for (i,enable) in clic.clicintie.localint.iter().enumerate() {
             enable.write(inten::IntEn::SET);
     }
+    clic.clicintie.localint[18].write(inten::IntEn::CLEAR);
 }
 
 // Disable pending interrupts
@@ -188,7 +189,7 @@ pub unsafe fn next_pending() -> Option<u32> {
     let clic: &ClicRegisters = &*CLIC_BASE;
 
     for (i, pending) in clic.clicintip.localintpend.iter().enumerate() {
-            if pending.is_set(intpend::IntPend) {
+            if pending.is_set(intpend::IntPend) && i != 18 && i != 19 && i != 20 && i != 21{
                 return Some((i+16) as u32);
         }
     }
@@ -224,7 +225,7 @@ pub unsafe fn has_pending() -> bool {
     }
 
     for (i, pending) in clic.clicintip.localintpend.iter().enumerate() {
-        if pending.is_set(intpend::IntPend)  {
+        if pending.is_set(intpend::IntPend) && i != 18 && i != 19 && i != 20 && i != 21{
             return true;
         }
     }

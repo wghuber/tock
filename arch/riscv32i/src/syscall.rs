@@ -70,19 +70,25 @@ impl kernel::syscall::UserspaceKernelBoundary for SysCall {
         ) -> (*mut usize, kernel::syscall::ContextSwitchReason) {
         
         let mut mstatus: u32;
+        let mut a0: u32;
+        mstatus = 0;
 
         unsafe{
             asm! ("
               // CSR 0x300 mstatus
               csrr t3, 0x300
+              mv $0, t3
               "
               : "=r" (mstatus)
               : 
               :
               : "volatile");
         }
+        //debug!("{}", mstatus);
 
         mstatus = (mstatus  &! 0x00000100 &! 0x00000002) | 0x00000020;
+
+        
 
         unsafe{
             asm! ("
@@ -93,13 +99,30 @@ impl kernel::syscall::UserspaceKernelBoundary for SysCall {
               li a1, 0x00000006
               li a2, 0x00000007
               li a3, 0x00000008
-              mret
+              //mret
               "
               : 
               : "r"(mstatus), "r"(0x40430060), "r"(stack_pointer)
               : "a0", "a1", "a2", "a3"
               : "volatile");
         }    
+
+        unsafe{
+            asm! ("
+              mv $0, a2
+              "
+              : "=r" (a0)
+              : 
+              :
+              : "volatile");
+        }
+
+        debug!("{}", a0);
+
+        unsafe{
+            asm! ("mret");
+        }
+
         (
             stack_pointer as *mut usize,
             kernel::syscall::ContextSwitchReason::Fault,

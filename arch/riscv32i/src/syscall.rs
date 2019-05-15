@@ -75,51 +75,51 @@ impl kernel::syscall::UserspaceKernelBoundary for SysCall {
         let mut mstatus: u32;
         mstatus = 0;
 
-        // unsafe{
+        unsafe{
 
-        //     asm! ("
-        //       // save kernel registers, and sp in mscratch (0x340)
-        //       sw x1,1*4(x2)
-        //       sw x3,3*4(x2)
-        //       sw x4,4*4(x2)
-        //       sw x5,5*4(x2)
-        //       sw x6,6*4(x2)
-        //       sw x7,7*4(x2)
-        //       sw x8,8*4(x2)
-        //       sw x9,9*4(x2)
-        //       sw x10,10*4(x2)
-        //       sw x11,11*4(x2)
-        //       sw x12,12*4(x2)
-        //       sw x13,13*4(x2)
-        //       sw x14,14*4(x2)
-        //       sw x15,15*4(x2)
-        //       sw x16,16*4(x2)
-        //       sw x17,17*4(x2)
-        //       sw x18,18*4(x2)
-        //       sw x19,19*4(x2)
-        //       sw x20,20*4(x2)
-        //       sw x21,21*4(x2)
-        //       sw x22,22*4(x2)
-        //       sw x23,23*4(x2)
-        //       sw x24,24*4(x2)
-        //       sw x25,25*4(x2)
-        //       sw x26,26*4(x2)
-        //       sw x27,27*4(x2)
-        //       sw x28,28*4(x2)
-        //       sw x29,29*4(x2)
-        //       sw x30,30*4(x2)
-        //       sw x31,31*4(x2)
+            asm! ("
+              // save kernel registers, and sp in mscratch (0x340)
+              sw x1,1*4(x2)
+              sw x3,3*4(x2)
+              sw x4,4*4(x2)
+              sw x5,5*4(x2)
+              sw x6,6*4(x2)
+              sw x7,7*4(x2)
+              sw x8,8*4(x2)
+              sw x9,9*4(x2)
+              sw x10,10*4(x2)
+              sw x11,11*4(x2)
+              sw x12,12*4(x2)
+              sw x13,13*4(x2)
+              sw x14,14*4(x2)
+              sw x15,15*4(x2)
+              sw x16,16*4(x2)
+              sw x17,17*4(x2)
+              sw x18,18*4(x2)
+              sw x19,19*4(x2)
+              sw x20,20*4(x2)
+              sw x21,21*4(x2)
+              sw x22,22*4(x2)
+              sw x23,23*4(x2)
+              sw x24,24*4(x2)
+              sw x25,25*4(x2)
+              sw x26,26*4(x2)
+              sw x27,27*4(x2)
+              sw x28,28*4(x2)
+              sw x29,29*4(x2)
+              sw x30,30*4(x2)
+              sw x31,31*4(x2)
 
-        //       //store process state pointer on stack
-        //       add t0, x0, $0
-        //       sw t0, 32*4(x2)
-        //       csrw 0x340, x2
-        //       "
-        //       :
-        //       :"r"(_state)
-        //       :
-        //       :"volatile");
-        // }
+              //store process state pointer on stack
+              add t0, x0, $0
+              sw t0, 32*4(x2)
+              csrw 0x340, x2
+              "
+              :
+              :"r"(_state)
+              :
+              :"volatile");
+        }
 
         unsafe{
             asm! ("
@@ -148,8 +148,6 @@ impl kernel::syscall::UserspaceKernelBoundary for SysCall {
               li a1, 0x00000006
               li a2, 0x00000007
               li a3, 0x00000008
-              // lui a0, %hi(0x40430060)
-              // jalr ra, a0, %lo(0x40430060)
               mret
               "
               : 
@@ -166,7 +164,7 @@ impl kernel::syscall::UserspaceKernelBoundary for SysCall {
                 nop
                 ");
         }   
-
+        //debug_gpio!(0, set);
           
         (
             stack_pointer as *mut usize,

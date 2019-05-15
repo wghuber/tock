@@ -304,6 +304,16 @@ riscv32i::enable_clic_interrupts();
     //     jalr ra, a0, %lo(0x40430060)
     //     ");
 
+    // set initial previous privilege mode to machine mode
+    // without this the trap handler will handle any exception like it came from user mode
+    asm!("
+        csrr t0, 0x300
+        lui t1, %hi(0x00001800)
+        addi t1, t1, %lo(0x00001800)
+        or  t2, t0, t1
+        csrw 0x300, t2
+        ");
+
     // testing some mret jump-around code
 
     // asm!("

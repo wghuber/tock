@@ -167,6 +167,8 @@ pub unsafe fn enable_clic_interrupts() {
       : "volatile");
 }
 
+
+
 /// Trap entry point (_start_trap)
 ///
 /// Saves caller saved registers ra, t0..6, a0..7, calls _start_trap_rust,

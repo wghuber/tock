@@ -180,6 +180,61 @@ global_asm!(
   .global _start_trap
 
 _start_trap:
+  // Check if it came from the kernel (0x00001800 is 11 for machine mode)
+  csrr t0, 0x300
+  lui t1, %hi(0x00001800)
+  addi t1, t1, %lo(0x00001800)
+  or  t2, t0, t1
+  beq  t0, t2, _from_kernel
+
+  // restore kernel sp and registers
+  csrr sp, 0x340
+  lw  x1,1*4(sp)
+  lw  x2,2*4(sp)
+  lw  x3,3*4(sp)
+  lw  x4,4*4(sp)
+  lw  x5,5*4(sp)
+  lw  x6,6*4(sp)
+  lw  x7,7*4(sp)
+  lw  x8,8*4(sp)
+  lw  x9,9*4(sp)
+  lw  x11,11*4(sp)
+  lw  x12,12*4(sp)
+  lw  x13,13*4(sp)
+  lw  x14,14*4(sp)
+  lw  x15,15*4(sp)
+  lw  x16,16*4(sp)
+  lw  x17,17*4(sp)
+  lw  x18,18*4(sp)
+  lw  x19,19*4(sp)
+  lw  x20,20*4(sp)
+  lw  x21,21*4(sp)
+  lw  x22,22*4(sp)
+  lw  x23,23*4(sp)
+  lw  x24,24*4(sp)
+  lw  x25,25*4(sp)
+  lw  x26,26*4(sp)
+  lw  x27,27*4(sp)
+  lw  x28,28*4(sp)
+  lw  x29,29*4(sp)
+  lw  x30,30*4(sp)
+  lw  x31,31*4(sp)
+
+  //get pc
+  // lw  t0, 32*4(sp)
+  // csrw 0x341, t0
+
+  //save mcause in mscratch
+  csrr t3, 0x342
+  csrw 0x340, t3
+
+  //jump back to kernel
+  // li t4, _return_to_kernel
+  // csrw 0x341, t4
+  //mret
+  j _return_to_kernel
+
+_from_kernel:
   addi sp, sp, -16*4
 
   sw ra, 0*4(sp)
@@ -249,8 +304,6 @@ _start_trap:
 // #[link_section = ".trap.rust"]
 #[export_name = "_start_trap_rust"]
 pub extern "C" fn start_trap_rust() {
-  // debug_gpio!(1, toggle);
-  debug_gpio!(2, toggle);
   unsafe {clic::disable_mtip();}
   unsafe {clic::disable_pending();}
     // while(true){};

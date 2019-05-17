@@ -134,7 +134,7 @@ impl kernel::syscall::UserspaceKernelBoundary for SysCall {
         }
 
         // (read_csr(mstatus) &~ MSTATUS_MPP &~ MSTATUS_MIE) | MSTATUS_MPIE
-        mstatus = (mstatus  &! 0x00000100 &! 0x00000002) | 0x00000020;
+        mstatus = (mstatus  &! 0x00001800 &! 0x00000008) | 0x00000080;
 
         unsafe{
             asm! ("
@@ -162,9 +162,20 @@ impl kernel::syscall::UserspaceKernelBoundary for SysCall {
              _return_to_kernel:
                 nop
                 nop
+                // // Set gpio pin 0 as output
+                // lui t5, 0x20002
+                // addi t5, t5, 0x00000008
+                // li t6, 0x00000007
+                // sw t6, 0(t5)
+                // //turn on LED
+                // lui t5, 0x20002
+                // addi t5, t5, 0x0000000c
+                // li t6, 0x00000001
+                // sw t6, 0(t5)
                 ");
-        }   
-        //debug_gpio!(0, set);
+        }
+         
+        //debug_gpio!(1, set);
           
         (
             stack_pointer as *mut usize,

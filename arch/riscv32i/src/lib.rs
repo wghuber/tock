@@ -184,32 +184,73 @@ global_asm!(
 _start_trap:
 
   // some mcause check code 
-  // csrr t0, 0x342
-  // li t1, 0x0000000b
-  // or  t2, t0, t1
-  // beq  t2, t0, _from_app
+  csrr t0, 0x342
+  li t1, 0x00000008
+  beq  t1, t0, _from_app
 
   // Check if it came from the kernel (0x00001800 is 11 for machine mode)
-  csrr t0, 0x300
-  lui t1, %hi(0x00001800)
-  addi t1, t1, %lo(0x00001800)
-  or  t2, t0, t1
-  beq  t0, t2, _from_kernel
+  // csrr t0, 0x300
+  // lui t1, %hi(0x00001800)
+  // addi t1, t1, %lo(0x00001800)
+  // or  t2, t0, t1
+  // beq  t0, t2, _from_kernel
 
+
+_from_kernel:
+  addi sp, sp, -16*4
+
+  sw ra, 0*4(sp)
+  sw t0, 1*4(sp)
+  sw t1, 2*4(sp)
+  sw t2, 3*4(sp)
+  sw t3, 4*4(sp)
+  sw t4, 5*4(sp)
+  sw t5, 6*4(sp)
+  sw t6, 7*4(sp)
+  sw a0, 8*4(sp)
+  sw a1, 9*4(sp)
+  sw a2, 10*4(sp)
+  sw a3, 11*4(sp)
+  sw a4, 12*4(sp)
+  sw a5, 13*4(sp)
+  sw a6, 14*4(sp)
+  sw a7, 15*4(sp)
+
+  jal ra, _start_trap_rust
+
+  lw ra, 0*4(sp)
+  lw t0, 1*4(sp)
+  lw t1, 2*4(sp)
+  lw t2, 3*4(sp)
+  lw t3, 4*4(sp)
+  lw t4, 5*4(sp)
+  lw t5, 6*4(sp)
+  lw t6, 7*4(sp)
+  lw a0, 8*4(sp)
+  lw a1, 9*4(sp)
+  lw a2, 10*4(sp)
+  lw a3, 11*4(sp)
+  lw a4, 12*4(sp)
+  lw a5, 13*4(sp)
+  lw a6, 14*4(sp)
+  lw a7, 15*4(sp)
+
+  addi sp, sp, 16*4
+  mret
 
 _from_app:
-
-  turn on LED
+  
+      //turn on LED
   lui t5, 0x20002
   addi t5, t5, 0x00000008
   li t6, 0x00000007
   sw t6, 0(t5)
   lui t5, 0x20002
   addi t5, t5, 0x0000000c
-  li t6, 0x00000004
+  li t6, 0x00000001
   sw t6, 0(t5)
   
-  restore kernel sp and registers
+  //restore kernel sp and registers
 
   csrr sp, 0x340
   lw  x1,1*4(sp)
@@ -257,48 +298,7 @@ _from_app:
   //mret
   j _return_to_kernel
 
-
-_from_kernel:
-  addi sp, sp, -16*4
-
-  sw ra, 0*4(sp)
-  sw t0, 1*4(sp)
-  sw t1, 2*4(sp)
-  sw t2, 3*4(sp)
-  sw t3, 4*4(sp)
-  sw t4, 5*4(sp)
-  sw t5, 6*4(sp)
-  sw t6, 7*4(sp)
-  sw a0, 8*4(sp)
-  sw a1, 9*4(sp)
-  sw a2, 10*4(sp)
-  sw a3, 11*4(sp)
-  sw a4, 12*4(sp)
-  sw a5, 13*4(sp)
-  sw a6, 14*4(sp)
-  sw a7, 15*4(sp)
-
-  jal ra, _start_trap_rust
-
-  lw ra, 0*4(sp)
-  lw t0, 1*4(sp)
-  lw t1, 2*4(sp)
-  lw t2, 3*4(sp)
-  lw t3, 4*4(sp)
-  lw t4, 5*4(sp)
-  lw t5, 6*4(sp)
-  lw t6, 7*4(sp)
-  lw a0, 8*4(sp)
-  lw a1, 9*4(sp)
-  lw a2, 10*4(sp)
-  lw a3, 11*4(sp)
-  lw a4, 12*4(sp)
-  lw a5, 13*4(sp)
-  lw a6, 14*4(sp)
-  lw a7, 15*4(sp)
-
-  addi sp, sp, 16*4
-  mret
+  
 "#
 );
 

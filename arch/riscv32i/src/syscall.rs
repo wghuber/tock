@@ -120,7 +120,7 @@ impl kernel::syscall::UserspaceKernelBoundary for SysCall {
               :
               :"volatile");
         }
-
+        // debug_gpio!(0, set);
         unsafe{
             asm! ("
               // Read mstatus (0x300) into mstatus var
@@ -135,6 +135,7 @@ impl kernel::syscall::UserspaceKernelBoundary for SysCall {
 
         // (read_csr(mstatus) &~ MSTATUS_MPP &~ MSTATUS_MIE) | MSTATUS_MPIE
         mstatus = (mstatus  &! 0x00001800 &! 0x00000008) | 0x00000080;
+        //mstatus = 0x00000000;
 
         unsafe{
             asm! ("
@@ -148,7 +149,9 @@ impl kernel::syscall::UserspaceKernelBoundary for SysCall {
               li a1, 0x00000006
               li a2, 0x00000007
               li a3, 0x00000008
-              mret
+              //mret
+              lui a0, %hi(0x40430060)
+              jalr ra, a0, %lo(0x40430060)
               "
               : 
               : "r"(mstatus), "r"(0x40430060), "r"(stack_pointer)
@@ -174,8 +177,6 @@ impl kernel::syscall::UserspaceKernelBoundary for SysCall {
                 // sw t6, 0(t5)
                 ");
         }
-         
-        //debug_gpio!(1, set);
           
         (
             stack_pointer as *mut usize,

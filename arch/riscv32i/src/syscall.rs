@@ -80,9 +80,9 @@ impl kernel::syscall::UserspaceKernelBoundary for SysCall {
             asm! ("
               // save kernel registers, and sp in mscratch (0x340)
 
-              addi sp, sp, -31*4
+              addi sp, sp, -31*4  // Move the stack pointer down to make room.
 
-              sw x1,0*4(sp)
+              sw x1,0*4(sp)       // Save all of the registers on the kernel stack.
               sw x3,1*4(sp)
               sw x4,2*4(sp)
               sw x5,3*4(sp)
@@ -113,24 +113,23 @@ impl kernel::syscall::UserspaceKernelBoundary for SysCall {
               sw x30,28*4(sp)
               sw x31,29*4(sp)
 
-              //store process state pointer on stack
-              add t0, x0, $0
-              sw t0, 30*4(sp)
+              sw $0, 30*4(sp)     // Store process state pointer on stack as well.
 
-              // save stack pointer in mscratch
-              csrw 0x340, sp
+              csrw 0x340, sp      // Save stack pointer in mscratch. This allows
+                                  // us to find it when the app returns back to
+                                  // the kernel.
               "
               :
               :"r"(_state)
               :
               :"volatile");
         }
-        // debug_gpio!(0, set);
+
+        // Read current mstatus CSR and then modify it so we switch to
+        // user mode when running the app.
         unsafe{
             asm! ("
-              // Read mstatus (0x300) into mstatus var
-              csrr t3, 0x300
-              mv $0, t3
+              csrr $0, 0x300  // Read mstatus CSR
               "
               : "=r" (mstatus)
               :
@@ -139,24 +138,21 @@ impl kernel::syscall::UserspaceKernelBoundary for SysCall {
         }
 
         // (read_csr(mstatus) &~ MSTATUS_MPP &~ MSTATUS_MIE) | MSTATUS_MPIE
-        // mstatus = (mstatus  & !0x00001800 & !0x00000008) | 0x00000080;
-        mstatus = 0x00000080;
+        mstatus = (mstatus  & !0x00001800 & !0x00000008) | 0x00000080;
+        // mstatus = 0x00000080;
 
         unsafe{
             asm! ("
-              // Write mstatus, write app location to mepc, load stack pointer, set parameters
-              lui t1, %hi(0x40430060)
-              addi t1, t1, %lo(0x40430060)
-              csrw 0x300, $0
-              csrw 0x341, t1
-              add x2, x0, $2
-              li a0, 0x00000005
-              li a1, 0x00000006
-              li a2, 0x00000007
-              li a3, 0x00000008
+              // Write mstatus, write app location to mepc, load stack pointer,
+              // set parameters.
+              csrw 0x300, $0     // Set mstatus CSR
+              csrw 0x341, $1     // Set mepc CSR. This is the PC we want to go to.
+              add x2, x0, $2     // Set sp register with app stack pointer.
+              li a0, 0x00000005  // Arg0: `void* app_start`
+              li a1, 0x00000006  // Arg1: `void* mem_start`
+              li a2, 0x00000007  // Arg2: `void* memory_len`
+              li a3, 0x00000008  // Arg3: `void* app_heap_break`
               mret
-              // lui a0, %hi(0x40430060)
-              // jalr ra, a0, %lo(0x40430060)
               "
               :
               : "r"(mstatus), "r"(0x40430060), "r"(stack_pointer)
@@ -167,8 +163,15 @@ impl kernel::syscall::UserspaceKernelBoundary for SysCall {
 
         unsafe{
             asm!("
+
+            // make sure nothing weird is happening and ensure we aren't
+            // somehow just continuing without running the app and returning
+            // through the trap handler.
+            _do_not_pass:
+               j _do_not_pass
+
+
              _return_to_kernel:
-                nop
                 nop
                 // Set gpio pin 0 as output
                 lui t5, 0x20002

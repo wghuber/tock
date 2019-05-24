@@ -117,13 +117,13 @@ pub unsafe fn configure_trap_handler() {
     //
     // CSR 0x305 (mtvec, 'Machine trap-handler base address.') sets the address
     // of the trap handler. We do not care about its old value, so we don't
-    // bother reading it.
-    csrw 0x305, $0
+    // bother reading it. We want to enable direct CLIC mode so we set the
+    // second lowest bit.
+    ori  $0, $0, 0x02  // Set CLIC direct mode
+    csrw 0x305, $0     // Write the mtvec CSR.
     "
        :
-       // : "r"((&_start_trap) | 0x02)
-       : "r"(0x40400042)
-       // : "r"(&_start_trap)
+       : "r"(&_start_trap)
        :
        : "volatile");
 }
@@ -158,11 +158,13 @@ pub unsafe fn enable_clic_interrupts() {
 
     // enable machine mode interrupts
     asm! ("
-      // CSR 0x300 mstatus
-      csrw 0x300, $0
+      lui t0, %hi(0x0001808)       // Load the value we want mstatus to be.
+      addi t0, t0, %lo(0x0001808)  // This should keep the core in M-Mode and
+                                   // enable machine mode interrupts.
+      csrw 0x300, t0               // Save to the mstatus CSR.
       "
       :
-      : "r"(0x00000008)
+      :
       :
       : "volatile");
 }
@@ -268,6 +270,12 @@ _from_kernel:
   lw a7, 15*4(sp)
 
   addi sp, sp, 16*4
+
+  // set mstatus how we expect
+  lui t4, %hi(0x00001800)
+  addi t4, t4, %lo(0x00001800)
+  csrw 0x300, t4
+
   mret
 
 
@@ -329,21 +337,17 @@ _from_app:
   csrw 0x340, t3
 
 
-  //jump back to kernel
-  // li t4, _return_to_kernel
-  // csrw 0x341, t4
-  //mret
-
-
   lui t1, %hi(_return_to_kernel)
   addi t1, t1, %lo(_return_to_kernel)
   csrw 0x341, t1
+
+
+  // set mstatus how we expect
+  lui t4, %hi(0x00001808)
+  addi t4, t4, %lo(0x00001808)
+  csrw 0x300, t4
+
   mret
-
-
-  // j _return_to_kernel
-
-
 "#
 );
 

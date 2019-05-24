@@ -296,7 +296,7 @@ riscv32i::enable_clic_interrupts();
     // arty_exx::uart::UART0.initialize_gpio_pins(&arty_exx::gpio::PORT[17], &arty_exx::gpio::PORT[16]);
 
     //debug_gpio!(0, set);
-    debug!("Initialization complete. Entering main loop and does this matter at all");
+    debug!("NOWA Initialization complete. Entering main loop and does this matter at all");
     // debug!("Initialize have some more cool content here ok lets do it");
 
     // asm!("

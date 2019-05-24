@@ -262,7 +262,7 @@ riscv32i::enable_clic_interrupts();
 
 
 
-    
+
     let artye21 = ArtyE21 {
         // console: console,
         gpio: gpio,
@@ -297,7 +297,7 @@ riscv32i::enable_clic_interrupts();
 
     //debug_gpio!(0, set);
     debug!("Initialization complete. Entering main loop and does this matter at all");
-    debug!("Initialize have some more cool content here ok lets do it");
+    // debug!("Initialize have some more cool content here ok lets do it");
 
     // asm!("
     //     lui a0, %hi(0x40430060)
@@ -306,13 +306,13 @@ riscv32i::enable_clic_interrupts();
 
     // set initial previous privilege mode to machine mode
     // without this the trap handler will handle any exception like it came from user mode
-    asm!("
-        csrr t0, 0x300
-        lui t1, %hi(0x00001800)
-        addi t1, t1, %lo(0x00001800)
-        or  t2, t0, t1
-        csrw 0x300, t2
-        ");
+    // asm!("
+    //     csrr t0, 0x300
+    //     lui t1, %hi(0x00001800)
+    //     addi t1, t1, %lo(0x00001800)
+    //     or  t2, t0, t1
+    //     csrw 0x300, t2
+    //     ");
 
     // testing some mret jump-around code
 
@@ -324,7 +324,7 @@ riscv32i::enable_clic_interrupts();
 
     //     // now go to what is in mepc
     //     mret
-    //     " ::::);     
+    //     " ::::);
 
     extern "C" {
         /// Beginning of the ROM region containing app images.

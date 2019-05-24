@@ -183,10 +183,42 @@ global_asm!(
 
 _start_trap:
 
-  // some mcause check code 
+
+  //     //turn on purple LED
+  // lui t5, 0x20002
+  // addi t5, t5, 0x00000008
+  // li t6, 0x00000007
+  // sw t6, 0(t5)
+  // lui t5, 0x20002
+  // addi t5, t5, 0x0000000c
+  // li t6, 0x5
+  // sw t6, 0(t5)
+
+
+  // // some mcause check code
+  // csrr t0, 0x342
+  // li t1, 0x00000008
+  // beq  t1, t0, _from_app
+
+
+
+  // if mcause < 0 (aka interrupt bit is one, go to the kernel for now)
   csrr t0, 0x342
-  li t1, 0x00000008
-  beq  t1, t0, _from_app
+  blt  t0, x0, _from_kernel
+
+
+  andi  t0, t0, 0x1ff    // "and" with 9 lower bits of zero to mask off just the
+                         // cause. This is needed because the E21 core uses
+                         // several of the upper bits for other flags.
+  li    t1, 11           // "11" is the index of ECALL from M mode.
+  beq  t0, t1, _from_app // Check if we did an ECALL and handle it correctly.
+
+
+  // lui t1, %hi(0xfFFFFFFF)
+  // addi t1, t1, %lo(0xfFFFFFFF)
+  // // li t1, 0x000000ff
+  // bgt t0, t1, _from_app
+  // // j _from_app
 
   // Check if it came from the kernel (0x00001800 is 11 for machine mode)
   // csrr t0, 0x300
@@ -238,8 +270,9 @@ _from_kernel:
   addi sp, sp, 16*4
   mret
 
+
 _from_app:
-  
+
       //turn on LED
   lui t5, 0x20002
   addi t5, t5, 0x00000008
@@ -249,40 +282,43 @@ _from_app:
   addi t5, t5, 0x0000000c
   li t6, 0x00000001
   sw t6, 0(t5)
-  
+
+
   //restore kernel sp and registers
 
   csrr sp, 0x340
-  lw  x1,1*4(sp)
-  lw  x2,2*4(sp)
-  lw  x3,3*4(sp)
-  lw  x4,4*4(sp)
-  lw  x5,5*4(sp)
-  lw  x6,6*4(sp)
-  lw  x7,7*4(sp)
-  lw  x8,8*4(sp)
-  lw  x9,9*4(sp)
-  lw  x11,11*4(sp)
-  lw  x12,12*4(sp)
-  lw  x13,13*4(sp)
-  lw  x14,14*4(sp)
-  lw  x15,15*4(sp)
-  lw  x16,16*4(sp)
-  lw  x17,17*4(sp)
-  lw  x18,18*4(sp)
-  lw  x19,19*4(sp)
-  lw  x20,20*4(sp)
-  lw  x21,21*4(sp)
-  lw  x22,22*4(sp)
-  lw  x23,23*4(sp)
-  lw  x24,24*4(sp)
-  lw  x25,25*4(sp)
-  lw  x26,26*4(sp)
-  lw  x27,27*4(sp)
-  lw  x28,28*4(sp)
-  lw  x29,29*4(sp)
-  lw  x30,30*4(sp)
-  lw  x31,31*4(sp)
+  lw  x1,0*4(sp)
+  lw  x3,1*4(sp)
+  lw  x4,2*4(sp)
+  lw  x5,3*4(sp)
+  lw  x6,4*4(sp)
+  lw  x7,5*4(sp)
+  lw  x8,6*4(sp)
+  lw  x9,7*4(sp)
+  lw  x10,8*4(sp)
+  lw  x11,9*4(sp)
+  lw  x12,10*4(sp)
+  lw  x13,11*4(sp)
+  lw  x14,12*4(sp)
+  lw  x15,13*4(sp)
+  lw  x16,14*4(sp)
+  lw  x17,15*4(sp)
+  lw  x18,16*4(sp)
+  lw  x19,17*4(sp)
+  lw  x20,18*4(sp)
+  lw  x21,19*4(sp)
+  lw  x22,20*4(sp)
+  lw  x23,21*4(sp)
+  lw  x24,22*4(sp)
+  lw  x25,23*4(sp)
+  lw  x26,24*4(sp)
+  lw  x27,25*4(sp)
+  lw  x28,26*4(sp)
+  lw  x29,27*4(sp)
+  lw  x30,28*4(sp)
+  lw  x31,29*4(sp)
+
+  addi sp, sp, 31*4
 
   //get pc
   // lw  t0, 32*4(sp)
@@ -292,13 +328,22 @@ _from_app:
   csrr t3, 0x342
   csrw 0x340, t3
 
+
   //jump back to kernel
   // li t4, _return_to_kernel
   // csrw 0x341, t4
   //mret
-  j _return_to_kernel
 
-  
+
+  lui t1, %hi(_return_to_kernel)
+  addi t1, t1, %lo(_return_to_kernel)
+  csrw 0x341, t1
+  mret
+
+
+  // j _return_to_kernel
+
+
 "#
 );
 

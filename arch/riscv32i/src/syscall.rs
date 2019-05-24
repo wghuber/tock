@@ -79,41 +79,46 @@ impl kernel::syscall::UserspaceKernelBoundary for SysCall {
 
             asm! ("
               // save kernel registers, and sp in mscratch (0x340)
-              sw x1,1*4(x2)
-              sw x3,3*4(x2)
-              sw x4,4*4(x2)
-              sw x5,5*4(x2)
-              sw x6,6*4(x2)
-              sw x7,7*4(x2)
-              sw x8,8*4(x2)
-              sw x9,9*4(x2)
-              sw x10,10*4(x2)
-              sw x11,11*4(x2)
-              sw x12,12*4(x2)
-              sw x13,13*4(x2)
-              sw x14,14*4(x2)
-              sw x15,15*4(x2)
-              sw x16,16*4(x2)
-              sw x17,17*4(x2)
-              sw x18,18*4(x2)
-              sw x19,19*4(x2)
-              sw x20,20*4(x2)
-              sw x21,21*4(x2)
-              sw x22,22*4(x2)
-              sw x23,23*4(x2)
-              sw x24,24*4(x2)
-              sw x25,25*4(x2)
-              sw x26,26*4(x2)
-              sw x27,27*4(x2)
-              sw x28,28*4(x2)
-              sw x29,29*4(x2)
-              sw x30,30*4(x2)
-              sw x31,31*4(x2)
+
+              addi sp, sp, -31*4
+
+              sw x1,0*4(sp)
+              sw x3,1*4(sp)
+              sw x4,2*4(sp)
+              sw x5,3*4(sp)
+              sw x6,4*4(sp)
+              sw x7,5*4(sp)
+              sw x8,6*4(sp)
+              sw x9,7*4(sp)
+              sw x10,8*4(sp)
+              sw x11,9*4(sp)
+              sw x12,10*4(sp)
+              sw x13,11*4(sp)
+              sw x14,12*4(sp)
+              sw x15,13*4(sp)
+              sw x16,14*4(sp)
+              sw x17,15*4(sp)
+              sw x18,16*4(sp)
+              sw x19,17*4(sp)
+              sw x20,18*4(sp)
+              sw x21,19*4(sp)
+              sw x22,20*4(sp)
+              sw x23,21*4(sp)
+              sw x24,22*4(sp)
+              sw x25,23*4(sp)
+              sw x26,24*4(sp)
+              sw x27,25*4(sp)
+              sw x28,26*4(sp)
+              sw x29,27*4(sp)
+              sw x30,28*4(sp)
+              sw x31,29*4(sp)
 
               //store process state pointer on stack
               add t0, x0, $0
-              sw t0, 32*4(x2)
-              csrw 0x340, x2
+              sw t0, 30*4(sp)
+
+              // save stack pointer in mscratch
+              csrw 0x340, sp
               "
               :
               :"r"(_state)
@@ -128,18 +133,18 @@ impl kernel::syscall::UserspaceKernelBoundary for SysCall {
               mv $0, t3
               "
               : "=r" (mstatus)
-              : 
+              :
               :
               : "volatile");
         }
 
         // (read_csr(mstatus) &~ MSTATUS_MPP &~ MSTATUS_MIE) | MSTATUS_MPIE
-        mstatus = (mstatus  &! 0x00001800 &! 0x00000008) | 0x00000080;
-        //mstatus = 0x00000000;
+        // mstatus = (mstatus  & !0x00001800 & !0x00000008) | 0x00000080;
+        mstatus = 0x00000080;
 
         unsafe{
             asm! ("
-              // Write mstatus, write app location to mepc, load stack pointer, set parameters  
+              // Write mstatus, write app location to mepc, load stack pointer, set parameters
               lui t1, %hi(0x40430060)
               addi t1, t1, %lo(0x40430060)
               csrw 0x300, $0
@@ -149,11 +154,11 @@ impl kernel::syscall::UserspaceKernelBoundary for SysCall {
               li a1, 0x00000006
               li a2, 0x00000007
               li a3, 0x00000008
-              //mret
-              lui a0, %hi(0x40430060)
-              jalr ra, a0, %lo(0x40430060)
+              mret
+              // lui a0, %hi(0x40430060)
+              // jalr ra, a0, %lo(0x40430060)
               "
-              : 
+              :
               : "r"(mstatus), "r"(0x40430060), "r"(stack_pointer)
               : "a0", "a1", "a2", "a3"
               : "volatile");
@@ -165,19 +170,21 @@ impl kernel::syscall::UserspaceKernelBoundary for SysCall {
              _return_to_kernel:
                 nop
                 nop
-                // // Set gpio pin 0 as output
-                // lui t5, 0x20002
-                // addi t5, t5, 0x00000008
-                // li t6, 0x00000007
-                // sw t6, 0(t5)
-                // //turn on LED
-                // lui t5, 0x20002
-                // addi t5, t5, 0x0000000c
-                // li t6, 0x00000001
-                // sw t6, 0(t5)
+                // Set gpio pin 0 as output
+                lui t5, 0x20002
+                addi t5, t5, 0x00000008
+                li t6, 0x00000007
+                sw t6, 0(t5)
+                //turn on LED
+                lui t5, 0x20002
+                addi t5, t5, 0x0000000c
+                li t6, 0x00000004
+                sw t6, 0(t5)
                 ");
         }
-          
+
+        debug!("yay!! wow does this actually print a lot or what??");
+
         (
             stack_pointer as *mut usize,
             kernel::syscall::ContextSwitchReason::Fault,

@@ -62,7 +62,6 @@ pub fn load_processes<C: Chip>(
                 }
             } else {
                 procs[i] = process;
-                debug!("PC");
             }
 
             apps_in_flash_ptr = apps_in_flash_ptr.offset(flash_offset as isize);
@@ -494,7 +493,8 @@ impl<C: Chip> ProcessType for Process<'a, C> {
         match self.fault_response {
             FaultResponse::Panic => {
                 // process faulted. Panic and print status
-                panic!("Process {} had a fault", self.process_name);
+                // panic!("Process {} had a fault", self.process_name);
+                self.state.set(State::StoppedRunning);
             }
             FaultResponse::Restart => {
                 // Remove the tasks that were scheduled for the app from the

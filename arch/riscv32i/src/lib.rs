@@ -224,37 +224,17 @@ _start_trap:
   // beq  t1, t0, _from_app
 
 
-
-  // if mcause < 0 (aka interrupt bit is one, go to the kernel for now)
+  // First check which privilege level we came from. If we came from user mode
+  // then we need to handle that differently from if we came from kernel mode.
+  // Luckily in the E21, the MPP bits are included in the mcause register.
   csrr t0, 0x342              // CSR=0x342=mcause
-  blt  t0, x0, _from_kernel   // If negative, this was an interrupt.
-
-
-  // Check the various exception codes and handle them properly.
-
-  andi  t0, t0, 0x1ff     // `and` mcause with 9 lower bits of zero to mask off
-                          // just the cause. This is needed because the E21 core
-                          // uses several of the upper bits for other flags.
-
-_check_ecall_umode:
-  li    t1, 8             // "8" is the index of ECALL from U mode.
-  beq   t0, t1, _from_app // Check if we did an ECALL and handle it correctly.
+  srli t1, t0, 28             // Shift the mcause 28 bits to the right (MPP bits)
+  andi t1, t1, 0x3            // `and` to get only the bottom two MPP bits
+  beq  t1, x0, _from_app      // If MPP=00 then we came from user mode
 
 
 
-  // Stop here if we get here. This means there was some other exception that
-  // we are not handling. The red LED will come on.
-_go_red:
-  lui t5, 0x20002
-  addi t5, t5, 0x00000008
-  li t6, 0x00000007
-  sw t6, 0(t5)
-  lui t5, 0x20002
-  addi t5, t5, 0x0000000c
-  li t6, 0x1
-  sw t6, 0(t5)
-  j _go_red
-
+  // If we came from mcause.MPP=11 then we came from the kernel.
 
 
 
@@ -322,6 +302,8 @@ _from_kernel:
 
 
 _from_app:
+
+  // Save the app registers to the StoredState array.
 
   // Restore kernel sp and registers.
 

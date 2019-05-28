@@ -70,6 +70,27 @@ _start:
   // Set s0 (the frame pointer) to the start of the stack.
   add s0, sp, zero
 
+
+  // PMP PMP PMP
+  // PMP PMP PMP
+  // PMP PMP PMP
+  // PMP PMP PMP
+  // TODO: Add a real PMP driver!!
+  // Take some time to disable the PMP.
+
+  // Set the first region address to 0xFFFFFFFF. When using top-of-range mode
+  // this will include the entire address space.
+  lui t0, %hi(0xFFFFFFFF)
+  addi t0, t0, %lo(0xFFFFFFFF)
+  csrw 0x3b0, t0   // CSR=pmpaddr0
+
+  // Set the first region to use top-of-range and allow everything.
+  // This is equivalent to:
+  // R=1, W=1, X=1, A=01, L=0
+  li t0, 0x0F
+  csrw 0x3a0, t0   // CSR=pmpcfg0
+
+
   // With that initial setup out of the way, we now branch to the main code,
   // likely defined in a board's main.rs.
   jal zero, reset_handler
@@ -209,11 +230,61 @@ _start_trap:
   blt  t0, x0, _from_kernel
 
 
+
   andi  t0, t0, 0x1ff    // "and" with 9 lower bits of zero to mask off just the
                          // cause. This is needed because the E21 core uses
                          // several of the upper bits for other flags.
-  li    t1, 11           // "11" is the index of ECALL from M mode.
+
+
+  // li   t1, 1 // instruction load exception
+  // beq t0, t1, _go_yellow
+  // j _check_ecall
+
+
+
+
+_check_ecall:
+  li    t1, 8           // "8" is the index of ECALL from U mode.
   beq  t0, t1, _from_app // Check if we did an ECALL and handle it correctly.
+
+
+// _check_ecall_umode:
+//   li   t1, 8
+//   beq t0, t1, _go_yellow
+
+
+
+
+j _go_red
+
+
+
+_go_yellow:
+  lui t5, 0x20002
+  addi t5, t5, 0x00000008
+  li t6, 0x00000007
+  sw t6, 0(t5)
+  lui t5, 0x20002
+  addi t5, t5, 0x0000000c
+  li t6, 0x3
+  sw t6, 0(t5)
+  j _go_yellow
+
+
+
+
+_go_red:
+  lui t5, 0x20002
+  addi t5, t5, 0x00000008
+  li t6, 0x00000007
+  sw t6, 0(t5)
+  lui t5, 0x20002
+  addi t5, t5, 0x0000000c
+  li t6, 0x1
+  sw t6, 0(t5)
+  j _go_red
+
+
 
 
   // lui t1, %hi(0xfFFFFFFF)
@@ -280,6 +351,33 @@ _from_kernel:
 
 
 _from_app:
+
+
+
+  // csrr t0, 0x342
+  // // check the mpp bits e21 adds for us
+  // srli t1, t0, 28
+  // andi t1, t1, 0x3
+  // li   t2, 0x3
+  // beq t1, t2, _continue // if 0 (what we want), continue
+  j _continue
+
+_spin:
+      //turn on purple LED
+  lui t5, 0x20002
+  addi t5, t5, 0x00000008
+  li t6, 0x00000007
+  sw t6, 0(t5)
+  lui t5, 0x20002
+  addi t5, t5, 0x0000000c
+  li t6, 0x5
+  sw t6, 0(t5)
+  j _spin
+
+
+
+_continue:
+
 
       //turn on LED
   lui t5, 0x20002

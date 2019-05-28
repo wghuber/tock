@@ -226,53 +226,24 @@ _start_trap:
 
 
   // if mcause < 0 (aka interrupt bit is one, go to the kernel for now)
-  csrr t0, 0x342
-  blt  t0, x0, _from_kernel
+  csrr t0, 0x342              // CSR=0x342=mcause
+  blt  t0, x0, _from_kernel   // If negative, this was an interrupt.
+
+
+  // Check the various exception codes and handle them properly.
+
+  andi  t0, t0, 0x1ff     // `and` mcause with 9 lower bits of zero to mask off
+                          // just the cause. This is needed because the E21 core
+                          // uses several of the upper bits for other flags.
+
+_check_ecall_umode:
+  li    t1, 8             // "8" is the index of ECALL from U mode.
+  beq   t0, t1, _from_app // Check if we did an ECALL and handle it correctly.
 
 
 
-  andi  t0, t0, 0x1ff    // "and" with 9 lower bits of zero to mask off just the
-                         // cause. This is needed because the E21 core uses
-                         // several of the upper bits for other flags.
-
-
-  // li   t1, 1 // instruction load exception
-  // beq t0, t1, _go_yellow
-  // j _check_ecall
-
-
-
-
-_check_ecall:
-  li    t1, 8           // "8" is the index of ECALL from U mode.
-  beq  t0, t1, _from_app // Check if we did an ECALL and handle it correctly.
-
-
-// _check_ecall_umode:
-//   li   t1, 8
-//   beq t0, t1, _go_yellow
-
-
-
-
-j _go_red
-
-
-
-_go_yellow:
-  lui t5, 0x20002
-  addi t5, t5, 0x00000008
-  li t6, 0x00000007
-  sw t6, 0(t5)
-  lui t5, 0x20002
-  addi t5, t5, 0x0000000c
-  li t6, 0x3
-  sw t6, 0(t5)
-  j _go_yellow
-
-
-
-
+  // Stop here if we get here. This means there was some other exception that
+  // we are not handling. The red LED will come on.
 _go_red:
   lui t5, 0x20002
   addi t5, t5, 0x00000008
@@ -352,45 +323,7 @@ _from_kernel:
 
 _from_app:
 
-
-
-  // csrr t0, 0x342
-  // // check the mpp bits e21 adds for us
-  // srli t1, t0, 28
-  // andi t1, t1, 0x3
-  // li   t2, 0x3
-  // beq t1, t2, _continue // if 0 (what we want), continue
-  j _continue
-
-_spin:
-      //turn on purple LED
-  lui t5, 0x20002
-  addi t5, t5, 0x00000008
-  li t6, 0x00000007
-  sw t6, 0(t5)
-  lui t5, 0x20002
-  addi t5, t5, 0x0000000c
-  li t6, 0x5
-  sw t6, 0(t5)
-  j _spin
-
-
-
-_continue:
-
-
-      //turn on LED
-  lui t5, 0x20002
-  addi t5, t5, 0x00000008
-  li t6, 0x00000007
-  sw t6, 0(t5)
-  lui t5, 0x20002
-  addi t5, t5, 0x0000000c
-  li t6, 0x00000001
-  sw t6, 0(t5)
-
-
-  //restore kernel sp and registers
+  // Restore kernel sp and registers.
 
   csrr sp, 0x340
   lw  x1,0*4(sp)
@@ -435,6 +368,7 @@ _continue:
   csrw 0x340, t3
 
 
+  // Load the location in syscall.rs that we want to return to.
   lui t1, %hi(_return_to_kernel)
   addi t1, t1, %lo(_return_to_kernel)
   csrw 0x341, t1

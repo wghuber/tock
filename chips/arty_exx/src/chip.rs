@@ -38,37 +38,25 @@ impl kernel::Chip for ArtyExx {
 
     fn service_pending_interrupts(&self) {
         unsafe {
-
-            // debug_gpio!(2, toggle);
-
             while let Some(interrupt) = clic::next_pending() {
-                // if interrupt == 20 {
-                //     debug_gpio!(2, toggle);
-                // }
-                // if interrupt == 11 {
-                //     debug_gpio!(0, set);
-                // // }
-                // if interrupt == 16 {
-                //     debug_gpio!(0, set);
-                // }
-                // if interrupt == 20 {
-                //     debug_gpio!(1, set);
-                // }
-                // // if interrupt < 7 || interrupt > 8 {
-                // if interrupt == 32 {
-                //     // debug_gpio!(2, toggle);
-                // // if interrupt > 8 {
-                //     // debug_gpio!(0, toggle);
-                //     // debug_gpio!(2, toggle);
-                //     // debug_gpio!(2, toggle);
-                //     // debug_gpio!(2, toggle);
-                //     // debug_gpio!(2, toggle);
-                //     uart::UART0.handle_interrupt();
-                // }
                 match interrupt {
 
-                    32 => uart::UART0.handle_interrupt(),
-                    // index @ interrupts::GPIO0..interrupts::GPIO31 => gpio::PORT[index as usize].handle_interrupt(),
+                    interrupts::GPIO3 => gpio::PORT[3].handle_interrupt(),
+                    interrupts::GPIO4 => gpio::PORT[4].handle_interrupt(),
+                    interrupts::GPIO5 => gpio::PORT[5].handle_interrupt(),
+                    interrupts::GPIO6 => gpio::PORT[6].handle_interrupt(),
+                    interrupts::GPIO7 => gpio::PORT[7].handle_interrupt(),
+                    interrupts::GPIO8 => gpio::PORT[8].handle_interrupt(),
+                    interrupts::GPIO9 => gpio::PORT[9].handle_interrupt(),
+                    interrupts::GPIO10 => gpio::PORT[10].handle_interrupt(),
+                    interrupts::GPIO11 => gpio::PORT[11].handle_interrupt(),
+                    interrupts::GPIO12 => gpio::PORT[12].handle_interrupt(),
+                    interrupts::GPIO13 => gpio::PORT[13].handle_interrupt(),
+                    interrupts::GPIO14 => gpio::PORT[14].handle_interrupt(),
+                    interrupts::GPIO15 => gpio::PORT[15].handle_interrupt(),
+
+                    interrupts::UART0 => uart::UART0.handle_interrupt(),
+
                     _ => debug!("Pidx {}", interrupt),
                 }
 
@@ -80,18 +68,9 @@ impl kernel::Chip for ArtyExx {
     }
 
     fn has_pending_interrupts(&self) -> bool {
-        unsafe { clic::has_pending() }
-        // unsafe {
-        //     let k = clic::has_pending() ;
-
-        //     if k {
-        //         debug_gpio!(1, set);
-        //     }
-
-        //     k
-        // }
-
-        //false
+        unsafe {
+            clic::has_pending()
+        }
     }
 
     fn sleep(&self) {

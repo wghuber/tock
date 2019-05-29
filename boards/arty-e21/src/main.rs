@@ -45,7 +45,7 @@ pub static mut STACK_MEMORY: [u8; 0x1000] = [0; 0x1000];
 /// A structure representing this platform that holds references to all
 /// capsules for this platform.
 struct ArtyE21 {
-    // console: &'static capsules::console::Console<'static, UartDevice<'static>>,
+    console: &'static capsules::console::Console<'static, UartDevice<'static>>,
     gpio: &'static capsules::gpio::GPIO<'static, sifive::gpio::GpioPin>,
     // alarm: &'static capsules::alarm::AlarmDriver<
     //     'static,
@@ -63,7 +63,7 @@ impl Platform for ArtyE21 {
         F: FnOnce(Option<&kernel::Driver>) -> R,
     {
         match driver_num {
-            // capsules::console::DRIVER_NUM => f(Some(self.console)),
+            capsules::console::DRIVER_NUM => f(Some(self.console)),
             capsules::gpio::DRIVER_NUM => f(Some(self.gpio)),
 
             // capsules::alarm::DRIVER_NUM => f(Some(self.alarm)),
@@ -86,31 +86,10 @@ pub unsafe fn reset_handler() {
     riscv32i::init_memory();
     riscv32i::configure_trap_handler();
 
-    // arty_exx::watchdog::WATCHDOG.disable();
-    // arty_exx::rtc::RTC.disable();
-    // arty_exx::pwm::PWM0.disable();
-    // arty_exx::pwm::PWM1.disable();
-    // arty_exx::pwm::PWM2.disable();
-
-    // arty_exx::prci::PRCI.set_clock_frequency(arty_exx::prci::ClockFrequency::Freq18Mhz);
-
-    // THIS WORKED ON FE310, not on E21
-    // E21 HAS CLIC, NOT PLIC
-    // riscv32i::enable_clic_interrupts();
-
-    //riscv::register::mtvec::write(0x305,0x2);
 
     let process_mgmt_cap = create_capability!(capabilities::ProcessManagementCapability);
     let main_loop_cap = create_capability!(capabilities::MainLoopCapability);
-    // let memory_allocation_cap = create_capability!(capabilities::MemoryAllocationCapability);
-
-    // sam4l::pm::PM.setup_system_clock(sam4l::pm::SystemClockSource::PllExternalOscillatorAt48MHz {
-    //     frequency: sam4l::pm::OscillatorFrequency::Frequency16MHz,
-    //     startup_mode: sam4l::pm::OscillatorStartup::SlowStart,
-    // });
-
-    // // Source 32Khz and 1Khz clocks from RC23K (SAM4L Datasheet 11.6.8)
-    // sam4l::bpm::set_ck32source(sam4l::bpm::CK32Source::RC32K);
+    let memory_allocation_cap = create_capability!(capabilities::MemoryAllocationCapability);
 
     let board_kernel = static_init!(kernel::Kernel, kernel::Kernel::new(&PROCESSES));
 
@@ -120,8 +99,6 @@ pub unsafe fn reset_handler() {
         Some(&arty_exx::gpio::PORT[1]),
         Some(&arty_exx::gpio::PORT[8]),
     );
-
-
 
     let chip = static_init!(arty_exx::chip::ArtyExx, arty_exx::chip::ArtyExx::new());
 
@@ -137,20 +114,20 @@ pub unsafe fn reset_handler() {
     hil::uart::UART::set_client(&arty_exx::uart::UART0, uart_mux);
     uart_mux.initialize();
 
-    // // Create a UartDevice for the console.
-    // let console_uart = static_init!(UartDevice, UartDevice::new(uart_mux, true));
-    // console_uart.setup();
-    // let console = static_init!(
-    //     capsules::console::Console<UartDevice>,
-    //     capsules::console::Console::new(
-    //         console_uart,
-    //         115200,
-    //         &mut capsules::console::WRITE_BUF,
-    //         &mut capsules::console::READ_BUF,
-    //         board_kernel.create_grant()
-    //     )
-    // );
-    // hil::uart::UART::set_client(console_uart, console);
+    // Create a UartDevice for the console.
+    let console_uart = static_init!(UartDevice, UartDevice::new(uart_mux, true));
+    console_uart.setup();
+    let console = static_init!(
+        capsules::console::Console<UartDevice>,
+        capsules::console::Console::new(
+            console_uart,
+            115200,
+            &mut capsules::console::WRITE_BUF,
+            &mut capsules::console::READ_BUF,
+            board_kernel.create_grant(&memory_allocation_cap)
+        )
+    );
+    hil::uart::UART::set_client(console_uart, console);
 
     // let ast = &sam4l::ast::AST;
 
@@ -245,26 +222,24 @@ pub unsafe fn reset_handler() {
     hil::gpio::Pin::clear(&arty_exx::gpio::PORT[8]);
 
     hil::gpio::Pin::make_input(&arty_exx::gpio::PORT[4]);
-    hil::gpio::Pin::enable_interrupt(&arty_exx::gpio::PORT[4], 0, hil::gpio::InterruptMode::RisingEdge);
+    hil::gpio::Pin::enable_interrupt(&arty_exx::gpio::PORT[4], 4, hil::gpio::InterruptMode::RisingEdge);
 
     hil::gpio::Pin::make_input(&arty_exx::gpio::PORT[3]);
-    hil::gpio::Pin::enable_interrupt(&arty_exx::gpio::PORT[3], 0, hil::gpio::InterruptMode::RisingEdge);
+    hil::gpio::Pin::enable_interrupt(&arty_exx::gpio::PORT[3], 3, hil::gpio::InterruptMode::RisingEdge);
     // hil::gpio::Pin::make_input(&arty_exx::gpio::PORT[16]);
     // hil::gpio::Pin::enable_interrupt(&arty_exx::gpio::PORT[16], 0, hil::gpio::InterruptMode::RisingEdge);
     // hil::gpio::Pin::clear(&arty_exx::gpio::PORT[8]);
 
 
-// riscv32i::enable_clic_interrupts();
 
-// debug_gpio!(0, set);
 
-riscv32i::enable_clic_interrupts();
+    riscv32i::enable_clic_interrupts();
 
 
 
 
     let artye21 = ArtyE21 {
-        // console: console,
+        console: console,
         gpio: gpio,
         // alarm: alarm,
         led: led,
@@ -272,7 +247,7 @@ riscv32i::enable_clic_interrupts();
         // ipc: kernel::ipc::IPC::new(board_kernel),
     };
 
-    // hail.console.initialize();
+    artye21.console.initialize();
 
     // Create virtual device for kernel debug.
     let debugger_uart = static_init!(UartDevice, UartDevice::new(uart_mux, false));
@@ -295,36 +270,9 @@ riscv32i::enable_clic_interrupts();
 
     // arty_exx::uart::UART0.initialize_gpio_pins(&arty_exx::gpio::PORT[17], &arty_exx::gpio::PORT[16]);
 
-    //debug_gpio!(0, set);
-    debug!("NOWA Initialization complete. Entering main loop and does this matter at all");
+    debug!("wow cool Initialization complete. Entering main loop and does this matter at all");
     // debug!("Initialize have some more cool content here ok lets do it");
 
-    // asm!("
-    //     lui a0, %hi(0x40430060)
-    //     jalr ra, a0, %lo(0x40430060)
-    //     ");
-
-    // set initial previous privilege mode to machine mode
-    // without this the trap handler will handle any exception like it came from user mode
-    // asm!("
-    //     csrr t0, 0x300
-    //     lui t1, %hi(0x00001800)
-    //     addi t1, t1, %lo(0x00001800)
-    //     or  t2, t0, t1
-    //     csrw 0x300, t2
-    //     ");
-
-    // testing some mret jump-around code
-
-    // asm!("
-    //     // set mepc to 0x20c00000
-    //     lui a0, %hi(0x20c00000)
-    //     addi a0, a0, %lo(0x20c00000)
-    //     csrw 0x341, a0
-
-    //     // now go to what is in mepc
-    //     mret
-    //     " ::::);
 
     extern "C" {
         /// Beginning of the ROM region containing app images.

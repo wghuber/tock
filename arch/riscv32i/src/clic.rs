@@ -35,7 +35,6 @@ struct IntPendRegisters {
     _reserved3: [u8; 3],
     //Local Interrupt 0-127
     localintpend: [ReadWrite<u8, intpend::Register>; 128],
-    // localintpend: [ReadWrite<u8, intpend::Register>; 1008],
     _reserved4: [u8; 880]
 }
 
@@ -57,7 +56,6 @@ struct IntEnableRegisters {
     _reserved3: [u8; 3],
     //Local Interrupt 0-127
     localint: [ReadWrite<u8, inten::Register>; 128],
-    // localint: [ReadWrite<u8, inten::Register>; 1008],
     _reserved4: [u8; 880]
 }
 
@@ -78,7 +76,7 @@ struct IntConfigRegisters {
     csip: ReadWrite<u8, intcon::Register>,
     _reserved3: [u8; 3],
     //Local Interrupt 0-127
-    localint: [ReadWrite<u8, intcon::Register>; 1008],
+    localint: [ReadWrite<u8, intcon::Register>; 128],
     _reserved4: [u8; 880]
 }
 
@@ -87,7 +85,6 @@ struct IntConfigRegisters {
 struct ConfigRegisters {
     cliccfg: ReadWrite<u8, conreg::Register>,
 }
-
 
 
 register_bitfields![u8,
@@ -102,18 +99,20 @@ register_bitfields![u8,
       ]
   ];
 
-//NOT SURE WHICH BITS PG28
+// The data sheet isn't completely clear on this field, but it looks like there
+// are four bits for priority and level, and the lowest for bits of the register
+// are reserved.
 register_bitfields![u8,
       intcon [
-          IntCon OFFSET(3) NUMBITS(4) []
+          IntCon OFFSET(4) NUMBITS(4) []
       ]
   ];
 
 register_bitfields![u8,
       conreg [
           nvbits OFFSET(0) NUMBITS(1) [],
-          nlbits OFFSET(1) NUMBITS(3) [],
-          nmbits OFFSET(4) NUMBITS(3) []
+          nlbits OFFSET(1) NUMBITS(4) [],
+          nmbits OFFSET(5) NUMBITS(2) []
       ]
   ];
 
@@ -145,26 +144,25 @@ pub unsafe fn disable_mtip() {
 pub unsafe fn enable_all() {
     let clic: &ClicRegisters = &*CLIC_BASE;
 
-
     clic.clicintie.msip.write(inten::IntEn::SET);
     clic.clicintie.mtip.write(inten::IntEn::SET);
     clic.clicintie.meip.write(inten::IntEn::SET);
     clic.clicintie.csip.write(inten::IntEn::SET);
 
-
     for (i,enable) in clic.clicintie.localint.iter().enumerate() {
-            enable.write(inten::IntEn::SET);
+        enable.write(inten::IntEn::SET);
     }
-    clic.clicintie.localint[18].write(inten::IntEn::CLEAR);
 }
 
 // Disable pending interrupts
 pub unsafe fn disable_pending() {
     let clic: &ClicRegisters = &*CLIC_BASE;
 
+    // Iterate through all interrupts. If the interrupt is enabled and it
+    // is pending then disable the interrupt.
     for (i, pending) in clic.clicintip.localintpend.iter().enumerate() {
-            if pending.is_set(intpend::IntPend) && clic.clicintie.localint[i].is_set(inten::IntEn) {
-                clic.clicintie.localint[i].write(inten::IntEn::CLEAR);
+        if pending.is_set(intpend::IntPend) && clic.clicintie.localint[i].is_set(inten::IntEn) {
+            clic.clicintie.localint[i].write(inten::IntEn::CLEAR);
         }
     }
 }
@@ -188,9 +186,28 @@ pub unsafe fn disable_all() {
 pub unsafe fn next_pending() -> Option<u32> {
     let clic: &ClicRegisters = &*CLIC_BASE;
 
+    // HACK
+    // Ignore these interrupts since we don't use them.
+    // if clic.clicintip.msip.is_set(intpend::IntPend) {
+    //     return Some(3);
+    // } else if clic.clicintip.mtip.is_set(intpend::IntPend) {
+    //     return Some(7);
+    // } else if clic.clicintip.meip.is_set(intpend::IntPend) {
+    //     return Some(11);
+    // } else if clic.clicintip.csip.is_set(intpend::IntPend) {
+    //     return Some(12);
+    // }
+
     for (i, pending) in clic.clicintip.localintpend.iter().enumerate() {
-            if pending.is_set(intpend::IntPend) && i != 18 && i != 19 && i != 20 && i != 21{
-                return Some((i+16) as u32);
+        // HACK HACK
+        // Skip these interrupt numbers. I'm not sure what they go to, but they
+        // seem to always be pending.
+        if i >= 18 && i <= 21 {
+            continue;
+        }
+
+        if pending.is_set(intpend::IntPend) {
+            return Some((i+16) as u32);
         }
     }
     return None;
@@ -218,20 +235,23 @@ pub unsafe fn complete(index: u32) {
 pub unsafe fn has_pending() -> bool {
     let clic: &ClicRegisters = &*CLIC_BASE;
 
-    // return true;
-
     if clic.clicintip.csip.is_set(intpend::IntPend) {
         return true;
     }
 
     for (i, pending) in clic.clicintip.localintpend.iter().enumerate() {
-        if pending.is_set(intpend::IntPend) && i != 18 && i != 19 && i != 20 && i != 21{
+        // HACK HACK
+        // Skip these interrupt numbers. I'm not sure what they go to, but they
+        // seem to always be pending.
+        if i >= 18 && i <= 21 {
+            continue;
+        }
+
+        if pending.is_set(intpend::IntPend) {
             return true;
         }
     }
 
     return false;
-
-    // clic.clicintip.localintpend.iter().fold(0, |i, localintpend| localintpend.get() | i) != 0
 }
 

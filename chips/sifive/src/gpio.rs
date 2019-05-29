@@ -133,6 +133,14 @@ impl GpioPin {
     /// There are separate interrupts in PLIC for each pin, so the interrupt
     /// handler only needs to exist on each pin.
     pub fn handle_interrupt(&self) {
+        let regs = self.registers;
+
+        // Clear the pending GPIO interrupt.
+        regs.rise_ip.modify(self.set);
+        regs.fall_ip.modify(self.set);
+        regs.high_ip.modify(self.set);
+        regs.low_ip.modify(self.set);
+
         self.client.map(|client| {
             client.fired(self.client_data.get());
         });

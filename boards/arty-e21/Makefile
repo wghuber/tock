@@ -5,6 +5,16 @@ PLATFORM=arty-e21
 
 include ../Makefile.common
 
+TOCKLOADER=tockloader
+KERNEL_ADDRESS=0x400000
+
+TOCKLOADER_OPENOCD_FLAGS = --openocd --board arty
+
+.PHONY: flash-tockloader
+flash-tockloader: target/$(TARGET)/release/$(PLATFORM).bin
+	$(TOCKLOADER) $(TOCKLOADER_GENERAL_FLAGS) flash --address $(KERNEL_ADDRESS) $(TOCKLOADER_OPENOCD_FLAGS) $<
+
+
 flash-jlink: target/$(TARGET)/release/$(PLATFORM).elf
 	openocd -f arty-openocd-jlink.cfg \
 		-c "flash protect 0 64 last off; program $<; resume 0x40400000; exit"

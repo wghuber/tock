@@ -140,17 +140,22 @@ pub unsafe fn disable_mtip() {
     clic.clicintie.mtip.write(inten::IntEn::CLEAR);
 }
 
-/// Enable all interrupts.
+/// Enable ONLY the interrupts we actually want to use.
+///
+/// The CLIC allows disabled interrupts to still set the pending bit. Therefore
+/// we have to be very careful about which interrupts we check.
 pub unsafe fn enable_all() {
     let clic: &ClicRegisters = &*CLIC_BASE;
 
-    clic.clicintie.msip.write(inten::IntEn::SET);
-    clic.clicintie.mtip.write(inten::IntEn::SET);
-    clic.clicintie.meip.write(inten::IntEn::SET);
-    clic.clicintie.csip.write(inten::IntEn::SET);
+    // clic.clicintie.msip.write(inten::IntEn::SET);
+    // clic.clicintie.mtip.write(inten::IntEn::SET);
+    // clic.clicintie.meip.write(inten::IntEn::SET);
+    // clic.clicintie.csip.write(inten::IntEn::SET);
 
     for (i,enable) in clic.clicintie.localint.iter().enumerate() {
-        enable.write(inten::IntEn::SET);
+        if i >= 3 && i <= 16 {
+            enable.write(inten::IntEn::SET);
+        }
     }
 }
 
@@ -188,21 +193,21 @@ pub unsafe fn next_pending() -> Option<u32> {
 
     // HACK
     // Ignore these interrupts since we don't use them.
-    if clic.clicintip.msip.is_set(intpend::IntPend) {
-        return Some(3);
-    } else if clic.clicintip.mtip.is_set(intpend::IntPend) {
-        return Some(7);
-    } else if clic.clicintip.meip.is_set(intpend::IntPend) {
-        return Some(11);
-    } else if clic.clicintip.csip.is_set(intpend::IntPend) {
-        return Some(12);
-    }
+    // if clic.clicintip.msip.is_set(intpend::IntPend) {
+    //     return Some(3);
+    // } else if clic.clicintip.mtip.is_set(intpend::IntPend) {
+    //     return Some(7);
+    // } else if clic.clicintip.meip.is_set(intpend::IntPend) {
+    //     return Some(11);
+    // } else if clic.clicintip.csip.is_set(intpend::IntPend) {
+    //     return Some(12);
+    // }
 
     for (i, pending) in clic.clicintip.localintpend.iter().enumerate() {
         // HACK HACK
         // Skip these interrupt numbers. I'm not sure what they go to, but they
         // seem to always be pending.
-        if i >= 18 && i <= 21 {
+        if i < 3 || i > 16 {
             continue;
         }
 
@@ -235,15 +240,15 @@ pub unsafe fn complete(index: u32) {
 pub unsafe fn has_pending() -> bool {
     let clic: &ClicRegisters = &*CLIC_BASE;
 
-    if clic.clicintip.csip.is_set(intpend::IntPend) {
-        return true;
-    }
+    // if clic.clicintip.csip.is_set(intpend::IntPend) {
+    //     return true;
+    // }
 
     for (i, pending) in clic.clicintip.localintpend.iter().enumerate() {
         // HACK HACK
         // Skip these interrupt numbers. I'm not sure what they go to, but they
         // seem to always be pending.
-        if i >= 18 && i <= 21 {
+        if i < 3 || i > 16 {
             continue;
         }
 

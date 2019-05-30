@@ -91,6 +91,20 @@ _start:
   csrw 0x3a0, t0   // CSR=pmpcfg0
 
 
+
+  // Initialize machine timer mtimecmp to disable the machine timer interrupt.
+  li t0, -1                    // Set mtimecmp to 0xFFFFFFFF
+  lui t1, %hi(0x02004000)      // Load the address of mtimecmp to t1
+  addi t1, t1, %lo(0x02004000) // Load the address of mtimecmp to t1
+  sw t0, 0(t1)                 // mtimecmp is 64 bits, set to all ones
+  sw t0, 4(t1)                 // mtimecmp is 64 bits, set to all ones
+
+
+
+
+
+
+
   // With that initial setup out of the way, we now branch to the main code,
   // likely defined in a board's main.rs.
   jal zero, reset_handler

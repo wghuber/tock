@@ -188,15 +188,15 @@ pub unsafe fn next_pending() -> Option<u32> {
 
     // HACK
     // Ignore these interrupts since we don't use them.
-    // if clic.clicintip.msip.is_set(intpend::IntPend) {
-    //     return Some(3);
-    // } else if clic.clicintip.mtip.is_set(intpend::IntPend) {
-    //     return Some(7);
-    // } else if clic.clicintip.meip.is_set(intpend::IntPend) {
-    //     return Some(11);
-    // } else if clic.clicintip.csip.is_set(intpend::IntPend) {
-    //     return Some(12);
-    // }
+    if clic.clicintip.msip.is_set(intpend::IntPend) {
+        return Some(3);
+    } else if clic.clicintip.mtip.is_set(intpend::IntPend) {
+        return Some(7);
+    } else if clic.clicintip.meip.is_set(intpend::IntPend) {
+        return Some(11);
+    } else if clic.clicintip.csip.is_set(intpend::IntPend) {
+        return Some(12);
+    }
 
     for (i, pending) in clic.clicintip.localintpend.iter().enumerate() {
         // HACK HACK

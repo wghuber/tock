@@ -148,7 +148,7 @@ pub unsafe fn enable_all() {
     let clic: &ClicRegisters = &*CLIC_BASE;
 
     // clic.clicintie.msip.write(inten::IntEn::SET);
-    // clic.clicintie.mtip.write(inten::IntEn::SET);
+    clic.clicintie.mtip.write(inten::IntEn::SET);
     // clic.clicintie.meip.write(inten::IntEn::SET);
     // clic.clicintie.csip.write(inten::IntEn::SET);
 
@@ -162,6 +162,10 @@ pub unsafe fn enable_all() {
 // Disable pending interrupts
 pub unsafe fn disable_pending() {
     let clic: &ClicRegisters = &*CLIC_BASE;
+
+    if clic.clicintip.mtip.is_set(intpend::IntPend) {
+        clic.clicintie.mtip.write(inten::IntEn::SET);
+    }
 
     // Iterate through all interrupts. If the interrupt is enabled and it
     // is pending then disable the interrupt.
@@ -191,12 +195,14 @@ pub unsafe fn disable_all() {
 pub unsafe fn next_pending() -> Option<u32> {
     let clic: &ClicRegisters = &*CLIC_BASE;
 
+    if clic.clicintip.mtip.is_set(intpend::IntPend) {
+        return Some(7);
+    }
+
     // HACK
     // Ignore these interrupts since we don't use them.
     // if clic.clicintip.msip.is_set(intpend::IntPend) {
     //     return Some(3);
-    // } else if clic.clicintip.mtip.is_set(intpend::IntPend) {
-    //     return Some(7);
     // } else if clic.clicintip.meip.is_set(intpend::IntPend) {
     //     return Some(11);
     // } else if clic.clicintip.csip.is_set(intpend::IntPend) {
@@ -243,6 +249,9 @@ pub unsafe fn has_pending() -> bool {
     // if clic.clicintip.csip.is_set(intpend::IntPend) {
     //     return true;
     // }
+    if clic.clicintip.mtip.is_set(intpend::IntPend) {
+        return true;
+    }
 
     for (i, pending) in clic.clicintip.localintpend.iter().enumerate() {
         // HACK HACK

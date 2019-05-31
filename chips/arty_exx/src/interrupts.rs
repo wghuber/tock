@@ -2,6 +2,7 @@
 
 #![allow(dead_code)]
 
+pub const MTIP: u32 = 7; // Machine Timer
 
 pub const GPIO3: u32 = 19;
 pub const GPIO4: u32 = 20;

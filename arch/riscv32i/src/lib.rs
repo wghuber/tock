@@ -11,6 +11,7 @@ extern crate kernel;
 pub mod support;
 pub mod syscall;
 pub mod clic;
+pub mod machine_timer;
 
 extern "C" {
     // External function defined by the board main.rs.

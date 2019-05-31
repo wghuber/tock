@@ -1,5 +1,6 @@
 use riscv32i;
 use riscv32i::clic;
+use riscv32i::machine_timer;
 use kernel;
 use gpio;
 use interrupts;
@@ -40,6 +41,7 @@ impl kernel::Chip for ArtyExx {
         unsafe {
             while let Some(interrupt) = clic::next_pending() {
                 match interrupt {
+                    interrupts::MTIP => machine_timer::MACHINETIMER.handle_interrupt(),
 
                     interrupts::GPIO3 => gpio::PORT[3].handle_interrupt(),
                     interrupts::GPIO4 => gpio::PORT[4].handle_interrupt(),

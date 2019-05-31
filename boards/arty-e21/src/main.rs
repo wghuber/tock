@@ -3,6 +3,7 @@
 #![no_std]
 #![no_main]
 #![feature(asm)]
+#![feature(const_fn, in_band_lifetimes)]
 
 extern crate capsules;
 #[allow(unused_imports)]
@@ -12,12 +13,14 @@ extern crate arty_exx;
 extern crate riscv32i;
 extern crate sifive;
 
-// use capsules::virtual_alarm::{MuxAlarm, VirtualMuxAlarm};
+use capsules::virtual_alarm::{MuxAlarm, VirtualMuxAlarm};
 // use capsules::virtual_i2c::{I2CDevice, MuxI2C};
 use capsules::virtual_uart::{UartDevice, UartMux};
 use kernel::capabilities;
 use kernel::hil;
 use kernel::Platform;
+
+mod timer_test;
 
 pub mod io;
 
@@ -47,10 +50,10 @@ pub static mut STACK_MEMORY: [u8; 0x1000] = [0; 0x1000];
 struct ArtyE21 {
     console: &'static capsules::console::Console<'static, UartDevice<'static>>,
     gpio: &'static capsules::gpio::GPIO<'static, sifive::gpio::GpioPin>,
-    // alarm: &'static capsules::alarm::AlarmDriver<
-    //     'static,
-    //     VirtualMuxAlarm<'static, sam4l::ast::Ast<'static>>,
-    // >,
+    alarm: &'static capsules::alarm::AlarmDriver<
+        'static,
+        VirtualMuxAlarm<'static, riscv32i::machine_timer::MachineTimer>,
+    >,
     led: &'static capsules::led::LED<'static, sifive::gpio::GpioPin>,
     // button: &'static capsules::button::Button<'static, sam4l::gpio::GPIOPin>,
     // ipc: kernel::ipc::IPC,
@@ -66,7 +69,7 @@ impl Platform for ArtyE21 {
             capsules::console::DRIVER_NUM => f(Some(self.console)),
             capsules::gpio::DRIVER_NUM => f(Some(self.gpio)),
 
-            // capsules::alarm::DRIVER_NUM => f(Some(self.alarm)),
+            capsules::alarm::DRIVER_NUM => f(Some(self.alarm)),
             capsules::led::DRIVER_NUM => f(Some(self.led)),
             // capsules::button::DRIVER_NUM => f(Some(self.button)),
 
@@ -131,11 +134,51 @@ pub unsafe fn reset_handler() {
 
     // let ast = &sam4l::ast::AST;
 
-    // let mux_alarm = static_init!(
-    //     MuxAlarm<'static, sam4l::ast::Ast>,
-    //     MuxAlarm::new(&sam4l::ast::AST)
+    let mux_alarm = static_init!(
+        MuxAlarm<'static, riscv32i::machine_timer::MachineTimer>,
+        MuxAlarm::new(&riscv32i::machine_timer::MACHINETIMER)
+    );
+    riscv32i::machine_timer::MACHINETIMER.set_client(mux_alarm);
+
+    // Alarm
+    let virtual_alarm_user = static_init!(
+        VirtualMuxAlarm<'static, riscv32i::machine_timer::MachineTimer>,
+        VirtualMuxAlarm::new(mux_alarm)
+    );
+    let alarm = static_init!(
+        capsules::alarm::AlarmDriver<'static, VirtualMuxAlarm<'static, riscv32i::machine_timer::MachineTimer>>,
+        capsules::alarm::AlarmDriver::new(
+            virtual_alarm_user,
+            board_kernel.create_grant(&memory_allocation_cap)
+        )
+    );
+    virtual_alarm_user.set_client(alarm);
+
+
+
+
+
+
+
+    // let virtual_alarm_test = static_init!(
+    //     VirtualMuxAlarm<'static, riscv32i::machine_timer::MachineTimer>,
+    //     VirtualMuxAlarm::new(mux_alarm)
     // );
-    // ast.configure(mux_alarm);
+    // let timertest = static_init!(
+    //     timer_test::TimerTest<'static, VirtualMuxAlarm<'static, riscv32i::machine_timer::MachineTimer>>,
+    //     timer_test::TimerTest::new(virtual_alarm_test)
+    // );
+    // virtual_alarm_test.set_client(timertest);
+
+
+
+
+
+
+
+
+
+
 
     // // Initialize and enable SPI HAL
     // // Set up an SPI MUX, so there can be multiple clients
@@ -241,7 +284,7 @@ pub unsafe fn reset_handler() {
     let artye21 = ArtyE21 {
         console: console,
         gpio: gpio,
-        // alarm: alarm,
+        alarm: alarm,
         led: led,
         // button: button,
         // ipc: kernel::ipc::IPC::new(board_kernel),
@@ -273,6 +316,8 @@ pub unsafe fn reset_handler() {
     debug!("wow cool Initialization complete. Entering main loop and does this matter at all");
     // debug!("Initialize have some more cool content here ok lets do it");
 
+
+    // timertest.start();
 
     extern "C" {
         /// Beginning of the ROM region containing app images.

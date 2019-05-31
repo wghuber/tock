@@ -82,16 +82,13 @@ impl kernel::Chip for ArtyExx {
     }
 
     fn has_pending_interrupts(&self) -> bool {
-        unsafe {
-            self.clic.has_pending()
-        }
+        self.clic.has_pending()
     }
 
     fn sleep(&self) {
-        // unsafe {
-        // riscv32i::support::wfi();
-        riscv32i::support::nop();
-        // }
+        unsafe {
+            riscv32i::support::wfi();
+        }
     }
 
     unsafe fn atomic<F, R>(&self, f: F) -> R

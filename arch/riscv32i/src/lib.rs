@@ -169,9 +169,9 @@ pub unsafe fn configure_trap_handler() {
 /// to manage these.
 pub unsafe fn enable_clic_interrupts() {
 
-    clic::disable_all();
-    clic::clear_all_pending();
-    clic::enable_all();
+    clic::CLIC.disable_all();
+    clic::CLIC.clear_all_pending();
+    clic::CLIC.enable_all();
 
     // let m: u32;
     // let METAL_MIE_INTERRUPT: u32 = 0x00000008;
@@ -406,8 +406,7 @@ _from_app:
 // #[link_section = ".trap.rust"]
 #[export_name = "_start_trap_rust"]
 pub extern "C" fn start_trap_rust() {
-  unsafe {clic::disable_mtip();}
-  unsafe {clic::disable_pending();}
+  unsafe {clic::CLIC.disable_pending();}
     // while(true){};
     // // dispatch trap to handler
     // trap_handler(mcause::read().cause());

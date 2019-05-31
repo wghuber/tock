@@ -39,7 +39,7 @@ impl kernel::Chip for ArtyExx {
 
     fn service_pending_interrupts(&self) {
         unsafe {
-            while let Some(interrupt) = clic::next_pending() {
+            while let Some(interrupt) = clic::CLIC.next_pending() {
                 match interrupt {
                     interrupts::MTIP => machine_timer::MACHINETIMER.handle_interrupt(),
 
@@ -64,14 +64,14 @@ impl kernel::Chip for ArtyExx {
 
                 // Mark that we are done with this interrupt and the hardware
                 // can clear it.
-                clic::complete(interrupt);
+                clic::CLIC.complete(interrupt);
             }
         }
     }
 
     fn has_pending_interrupts(&self) -> bool {
         unsafe {
-            clic::has_pending()
+            clic::CLIC.has_pending()
         }
     }
 

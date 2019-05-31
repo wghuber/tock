@@ -276,7 +276,7 @@ pub unsafe fn reset_handler() {
 
 
 
-    riscv32i::enable_clic_interrupts();
+    chip.enable_all_interrupts();
 
 
 

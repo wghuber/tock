@@ -10,13 +10,25 @@ use uart;
 
 pub struct ArtyExx {
     userspace_kernel_boundary: riscv32i::syscall::SysCall,
+    clic: riscv32i::clic::Clic,
 }
 
 impl ArtyExx {
     pub unsafe fn new() -> ArtyExx {
+
+        // Make a bit-vector of all interrupt locations that we actually intend
+        // to use on this chip.
+        // 0001 1111 1111 1111 1111 0000 0000 1000 0000
+        let in_use_interrupts: u64 = 0x1FFFF0080;
+
         ArtyExx {
             userspace_kernel_boundary: riscv32i::syscall::SysCall::new(),
+            clic: riscv32i::clic::Clic::new(in_use_interrupts),
         }
+    }
+
+    pub fn enable_all_interrupts(&self) {
+        self.clic.enable_all();
     }
 }
 
@@ -39,7 +51,7 @@ impl kernel::Chip for ArtyExx {
 
     fn service_pending_interrupts(&self) {
         unsafe {
-            while let Some(interrupt) = clic::CLIC.next_pending() {
+            while let Some(interrupt) = self.clic.next_pending() {
                 match interrupt {
                     interrupts::MTIP => machine_timer::MACHINETIMER.handle_interrupt(),
 
@@ -64,14 +76,14 @@ impl kernel::Chip for ArtyExx {
 
                 // Mark that we are done with this interrupt and the hardware
                 // can clear it.
-                clic::CLIC.complete(interrupt);
+                self.clic.complete(interrupt);
             }
         }
     }
 
     fn has_pending_interrupts(&self) -> bool {
         unsafe {
-            clic::CLIC.has_pending()
+            self.clic.has_pending()
         }
     }
 

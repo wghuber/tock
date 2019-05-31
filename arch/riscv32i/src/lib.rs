@@ -1,13 +1,13 @@
 #![crate_name = "riscv32i"]
 #![crate_type = "rlib"]
 #![feature(asm, const_fn, lang_items, global_asm)]
+#![feature(crate_visibility_modifier)]
 #![no_std]
 
 #[macro_use(register_bitfields, register_bitmasks, debug_gpio, debug)]
 extern crate kernel;
 
-
-//pub mod plic;
+pub mod plic;
 pub mod support;
 pub mod syscall;
 pub mod clic;
@@ -165,45 +165,45 @@ pub unsafe fn configure_trap_handler() {
 }
 
 
-/// Enable all PLIC interrupts so that individual peripheral drivers do not have
-/// to manage these.
-pub unsafe fn enable_clic_interrupts() {
+// /// Enable all PLIC interrupts so that individual peripheral drivers do not have
+// /// to manage these.
+// pub unsafe fn enable_clic_interrupts() {
 
-    clic::CLIC.disable_all();
-    clic::CLIC.clear_all_pending();
-    clic::CLIC.enable_all();
+//     INT_CON.disable_all();
+//     INT_CON.clear_all_pending();
+//     INT_CON.enable_all();
 
-    // let m: u32;
-    // let METAL_MIE_INTERRUPT: u32 = 0x00000008;
+//     // let m: u32;
+//     // let METAL_MIE_INTERRUPT: u32 = 0x00000008;
 
-    // asm! ("csrrs %0, mstatus, %1" : "=r"(m) : "r"(METAL_MIE_INTERRUPT));
-
-
+//     // asm! ("csrrs %0, mstatus, %1" : "=r"(m) : "r"(METAL_MIE_INTERRUPT));
 
 
 
-    // // enable mie 1
-    // asm! ("
-    //   // CSR 0x304 mie
-    //   csrw 0x304, $0
-    //   "
-    //   :
-    //   : "r"(0x00000001)
-    //   :
-    //   : "volatile");
 
-    // enable machine mode interrupts
-    asm! ("
-      lui t0, %hi(0x0001808)       // Load the value we want mstatus to be.
-      addi t0, t0, %lo(0x0001808)  // This should keep the core in M-Mode and
-                                   // enable machine mode interrupts.
-      csrw 0x300, t0               // Save to the mstatus CSR.
-      "
-      :
-      :
-      :
-      : "volatile");
-}
+
+//     // // enable mie 1
+//     // asm! ("
+//     //   // CSR 0x304 mie
+//     //   csrw 0x304, $0
+//     //   "
+//     //   :
+//     //   : "r"(0x00000001)
+//     //   :
+//     //   : "volatile");
+
+//     // enable machine mode interrupts
+//     asm! ("
+//       lui t0, %hi(0x0001808)       // Load the value we want mstatus to be.
+//       addi t0, t0, %lo(0x0001808)  // This should keep the core in M-Mode and
+//                                    // enable machine mode interrupts.
+//       csrw 0x300, t0               // Save to the mstatus CSR.
+//       "
+//       :
+//       :
+//       :
+//       : "volatile");
+// }
 
 
 
@@ -406,7 +406,25 @@ _from_app:
 // #[link_section = ".trap.rust"]
 #[export_name = "_start_trap_rust"]
 pub extern "C" fn start_trap_rust() {
-  unsafe {clic::CLIC.disable_pending();}
+
+
+    // TODO!!!
+    // TODO!!!
+    // TODO!!!
+    // TODO!!!
+    //
+    // We need to disable the interrupt that fired when we get here so that it
+    // cannot re-fire.
+    //
+    // unsafe {CLIC.disable_pending_interrupts();}
+    //
+    // TODO!!!
+    // TODO!!!
+    // TODO!!!
+    // TODO!!!
+
+
+
     // while(true){};
     // // dispatch trap to handler
     // trap_handler(mcause::read().cause());

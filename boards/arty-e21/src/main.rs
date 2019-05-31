@@ -56,7 +56,7 @@ struct ArtyE21 {
         VirtualMuxAlarm<'static, riscv32i::machine_timer::MachineTimer>,
     >,
     led: &'static capsules::led::LED<'static, sifive::gpio::GpioPin>,
-    // button: &'static capsules::button::Button<'static, sam4l::gpio::GPIOPin>,
+    button: &'static capsules::button::Button<'static, sifive::gpio::GpioPin>,
     // ipc: kernel::ipc::IPC,
 }
 
@@ -72,7 +72,7 @@ impl Platform for ArtyE21 {
 
             capsules::alarm::DRIVER_NUM => f(Some(self.alarm)),
             capsules::led::DRIVER_NUM => f(Some(self.led)),
-            // capsules::button::DRIVER_NUM => f(Some(self.button)),
+            capsules::button::DRIVER_NUM => f(Some(self.button)),
 
             // kernel::ipc::DRIVER_NUM => f(Some(&self.ipc)),
             _ => f(None),
@@ -133,8 +133,8 @@ pub unsafe fn reset_handler() {
     );
     hil::uart::UART::set_client(console_uart, console);
 
-    // let ast = &sam4l::ast::AST;
-
+    // Create a shared virtualization mux layer on top of a single hardware
+    // alarm.
     let mux_alarm = static_init!(
         MuxAlarm<'static, riscv32i::machine_timer::MachineTimer>,
         MuxAlarm::new(&riscv32i::machine_timer::MACHINETIMER)
@@ -160,7 +160,8 @@ pub unsafe fn reset_handler() {
 
 
 
-
+    // TEST for timer
+    //
     // let virtual_alarm_test = static_init!(
     //     VirtualMuxAlarm<'static, riscv32i::machine_timer::MachineTimer>,
     //     VirtualMuxAlarm::new(mux_alarm)
@@ -174,22 +175,6 @@ pub unsafe fn reset_handler() {
 
 
 
-
-
-
-
-
-
-
-    // // Initialize and enable SPI HAL
-    // // Set up an SPI MUX, so there can be multiple clients
-    // let mux_spi = static_init!(
-    //     MuxSpiMaster<'static, sam4l::spi::SpiHw>,
-    //     MuxSpiMaster::new(&sam4l::spi::SPI)
-    // );
-
-    // sam4l::spi::SPI.set_client(mux_spi);
-    // sam4l::spi::SPI.init();
 
     // LEDs
     let led_pins = static_init!(
@@ -220,21 +205,21 @@ pub unsafe fn reset_handler() {
         capsules::led::LED::new(led_pins)
     );
 
-    // // BUTTONs
-    // let button_pins = static_init!(
-    //     [(&'static sam4l::gpio::GPIOPin, capsules::button::GpioMode); 1],
-    //     [(
-    //         &sam4l::gpio::PA[16],
-    //         capsules::button::GpioMode::LowWhenPressed
-    //     )]
-    // );
-    // let button = static_init!(
-    //     capsules::button::Button<'static, sam4l::gpio::GPIOPin>,
-    //     capsules::button::Button::new(button_pins, board_kernel.create_grant())
-    // );
-    // for &(btn, _) in button_pins.iter() {
-    //     btn.set_client(button);
-    // }
+    // BUTTONs
+    let button_pins = static_init!(
+        [(&'static sifive::gpio::GpioPin, capsules::button::GpioMode); 1],
+        [(
+            &arty_exx::gpio::PORT[4],
+            capsules::button::GpioMode::HighWhenPressed
+        )]
+    );
+    let button = static_init!(
+        capsules::button::Button<'static, sifive::gpio::GpioPin>,
+        capsules::button::Button::new(button_pins, board_kernel.create_grant(&memory_allocation_cap))
+    );
+    for &(btn, _) in button_pins.iter() {
+        btn.set_client(button);
+    }
 
     // set GPIO driver controlling remaining GPIO pins
     let gpio_pins = static_init!(
@@ -265,14 +250,14 @@ pub unsafe fn reset_handler() {
     hil::gpio::Pin::make_output(&arty_exx::gpio::PORT[8]);
     hil::gpio::Pin::clear(&arty_exx::gpio::PORT[8]);
 
-    hil::gpio::Pin::make_input(&arty_exx::gpio::PORT[4]);
-    hil::gpio::Pin::enable_interrupt(&arty_exx::gpio::PORT[4], 4, hil::gpio::InterruptMode::RisingEdge);
+    // hil::gpio::Pin::make_input(&arty_exx::gpio::PORT[4]);
+    // hil::gpio::Pin::enable_interrupt(&arty_exx::gpio::PORT[4], 4, hil::gpio::InterruptMode::RisingEdge);
 
-    hil::gpio::Pin::make_input(&arty_exx::gpio::PORT[3]);
-    hil::gpio::Pin::enable_interrupt(&arty_exx::gpio::PORT[3], 3, hil::gpio::InterruptMode::RisingEdge);
-    // hil::gpio::Pin::make_input(&arty_exx::gpio::PORT[16]);
-    // hil::gpio::Pin::enable_interrupt(&arty_exx::gpio::PORT[16], 0, hil::gpio::InterruptMode::RisingEdge);
-    // hil::gpio::Pin::clear(&arty_exx::gpio::PORT[8]);
+    // hil::gpio::Pin::make_input(&arty_exx::gpio::PORT[3]);
+    // hil::gpio::Pin::enable_interrupt(&arty_exx::gpio::PORT[3], 3, hil::gpio::InterruptMode::RisingEdge);
+    // // hil::gpio::Pin::make_input(&arty_exx::gpio::PORT[16]);
+    // // hil::gpio::Pin::enable_interrupt(&arty_exx::gpio::PORT[16], 0, hil::gpio::InterruptMode::RisingEdge);
+    // // hil::gpio::Pin::clear(&arty_exx::gpio::PORT[8]);
 
 
 
@@ -287,7 +272,7 @@ pub unsafe fn reset_handler() {
         gpio: gpio,
         alarm: alarm,
         led: led,
-        // button: button,
+        button: button,
         // ipc: kernel::ipc::IPC::new(board_kernel),
     };
 

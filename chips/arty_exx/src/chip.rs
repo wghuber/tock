@@ -1,5 +1,4 @@
 use riscv32i;
-use riscv32i::clic;
 use riscv32i::machine_timer;
 use kernel;
 use gpio;

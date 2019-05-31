@@ -65,7 +65,7 @@ impl Prci {
         // debug!("reg {:#x}", regs.hfrosccfg.get());
 
         // Assume a 72 MHz clock, then `div` is (72/frequency) - 1.
-        let div = match frequency {
+        match frequency {
             ClockFrequency::Freq18Mhz => {
                 // 4, // this seems wrong, but it works??
                 regs.hfrosccfg.modify(hfrosccfg::div.val(4));

@@ -1,6 +1,6 @@
 //! Platform Level Interrupt Control
 
-use kernel::common::registers::{self, ReadOnly, ReadWrite, WriteOnly};
+use kernel::common::registers::ReadWrite;
 use kernel::common::StaticRef;
 
 #[repr(C)]

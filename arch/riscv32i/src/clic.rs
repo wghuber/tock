@@ -1,6 +1,6 @@
 //! Core Local Interrupt Control
 
-use kernel::common::registers::{self, ReadOnly, ReadWrite, WriteOnly};
+use kernel::common::registers::ReadWrite;
 use kernel::common::StaticRef;
 
 //CLIC Hart Specific Region
@@ -84,7 +84,6 @@ struct IntConfigRegisters {
 struct ConfigRegisters {
     cliccfg: ReadWrite<u8, conreg::Register>,
 }
-
 
 register_bitfields![u8,
       intpend [

@@ -1,7 +1,7 @@
 //! Create a timer using the Machine Timer registers.
 
 use kernel::common::cells::OptionalCell;
-use kernel::common::registers::{self, ReadWrite, ReadOnly};
+use kernel::common::registers::{ReadWrite, ReadOnly};
 use kernel::common::StaticRef;
 use kernel::hil;
 

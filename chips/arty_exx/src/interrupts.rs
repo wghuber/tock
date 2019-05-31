@@ -4,6 +4,9 @@
 
 pub const MTIP: u32 = 7; // Machine Timer
 
+pub const GPIO0: u32 = 16;
+pub const GPIO1: u32 = 17;
+pub const GPIO2: u32 = 18;
 pub const GPIO3: u32 = 19;
 pub const GPIO4: u32 = 20;
 pub const GPIO5: u32 = 21;

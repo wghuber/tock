@@ -34,7 +34,7 @@ extern "C" {
     // Boundaries of the .data section.
     static mut _srelocate: u32;
     static mut _erelocate: u32;
-}
+  }
 
 /// Entry point of all programs (_start).
 ///
@@ -43,10 +43,10 @@ extern "C" {
 /// pointer. Then it calls _start_rust.
 #[cfg(any(target_arch = "riscv32", target_arch = "riscv64"))]
 global_asm!(
-    r#"
-.section .riscv.start, "ax"
-.globl _start
-_start:
+  r#"
+  .section .riscv.start, "ax"
+  .globl _start
+  _start:
   .cfi_startproc
   .cfi_undefined ra
 
@@ -111,8 +111,8 @@ _start:
   jal zero, reset_handler
 
   .cfi_endproc
-"#
-);
+  "#
+  );
 
 /// Setup memory for the kernel.
 ///
@@ -126,11 +126,11 @@ pub unsafe fn init_memory() {
     let mut psrc = &_etext as *const u32;
 
     if psrc != pdest {
-        while (pdest as *const u32) < pend {
-            *pdest = *psrc;
-            pdest = pdest.offset(1);
-            psrc = psrc.offset(1);
-        }
+      while (pdest as *const u32) < pend {
+        *pdest = *psrc;
+        pdest = pdest.offset(1);
+        psrc = psrc.offset(1);
+      }
     }
 
     // Clear the zero segment (BSS)
@@ -138,16 +138,16 @@ pub unsafe fn init_memory() {
     pdest = &mut _szero as *mut u32;
 
     while (pdest as *const u32) < pzero {
-        *pdest = 0;
-        pdest = pdest.offset(1);
+      *pdest = 0;
+      pdest = pdest.offset(1);
     }
-}
+  }
 
 /// Tell the MCU what address the trap handler is located at.
 ///
 /// The trap handler is called on exceptions and for interrupts.
 pub unsafe fn configure_trap_handler() {
-    asm!("
+  asm!("
     // The csrw instruction writes a Control and Status Register (CSR)
     // with a new value.
     //
@@ -158,10 +158,10 @@ pub unsafe fn configure_trap_handler() {
     ori  $0, $0, 0x02  // Set CLIC direct mode
     csrw 0x305, $0     // Write the mtvec CSR.
     "
-       :
-       : "r"(&_start_trap)
-       :
-       : "volatile");
+    :
+    : "r"(&_start_trap)
+    :
+    : "volatile");
 }
 
 
@@ -213,31 +213,13 @@ pub unsafe fn configure_trap_handler() {
 /// restores caller saved registers and then returns.
 #[cfg(any(target_arch = "riscv32", target_arch = "riscv64"))]
 global_asm!(
-    r#"
+  r#"
   .section .riscv.trap, "ax"
   .align 6
   //.p2align 6
   .global _start_trap
 
-_start_trap:
-
-
-  //     //turn on purple LED
-  // lui t5, 0x20002
-  // addi t5, t5, 0x00000008
-  // li t6, 0x00000007
-  // sw t6, 0(t5)
-  // lui t5, 0x20002
-  // addi t5, t5, 0x0000000c
-  // li t6, 0x5
-  // sw t6, 0(t5)
-
-
-  // // some mcause check code
-  // csrr t0, 0x342
-  // li t1, 0x00000008
-  // beq  t1, t0, _from_app
-
+  _start_trap:
 
   // First check which privilege level we came from. If we came from user mode
   // then we need to handle that differently from if we came from kernel mode.
@@ -267,7 +249,7 @@ _start_trap:
   // beq  t0, t2, _from_kernel
 
 
-_from_kernel:
+  _from_kernel:
   addi sp, sp, -16*4
 
   sw ra, 0*4(sp)
@@ -316,9 +298,44 @@ _from_kernel:
   mret
 
 
-_from_app:
+  _from_app:
 
   // Save the app registers to the StoredState array.
+  // Kernel SP was saved in mscratch, and stored state 
+  // pointer is on kernel stack
+  csrr t0, 0x340
+  lw t1, 30*4(t0) 
+
+  sw x1,0*4(t1)     
+  sw x3,1*4(t1)
+  sw x4,2*4(t1)
+  sw x5,3*4(t1)
+  sw x6,4*4(t1)
+  sw x7,5*4(t1)
+  sw x8,6*4(t1)
+  sw x9,7*4(t1)
+  sw x10,8*4(t1)
+  sw x11,9*4(t1)
+  sw x12,10*4(t1)
+  sw x13,11*4(t1)
+  sw x14,12*4(t1)
+  sw x15,13*4(t1)
+  sw x16,14*4(t1)
+  sw x17,15*4(t1)
+  sw x18,16*4(t1)
+  sw x19,17*4(t1)
+  sw x20,18*4(t1)
+  sw x21,19*4(t1)
+  sw x22,20*4(t1)
+  sw x23,21*4(t1)
+  sw x24,22*4(t1)
+  sw x25,23*4(t1)
+  sw x26,24*4(t1)
+  sw x27,25*4(t1)
+  sw x28,26*4(t1)
+  sw x29,27*4(t1)
+  sw x30,28*4(t1)
+  sw x31,29*4(t1)
 
   // Restore kernel sp and registers.
 
@@ -377,8 +394,8 @@ _from_app:
   csrw 0x300, t4
 
   mret
-"#
-);
+  "#
+  );
 
 
 // /// Trap entry point (_start_trap)
@@ -434,26 +451,26 @@ pub extern "C" fn start_trap_rust() {
     // }
 
     unsafe{
-    asm! ("
-      // CSR 0x300 mstatus
-      csrw 0x300, $0
-      "
-      :
-      : "r"(0x00001808)
-      :
-      : "volatile");
+      asm! ("
+        // CSR 0x300 mstatus
+        csrw 0x300, $0
+        "
+        :
+        : "r"(0x00001808)
+        :
+        : "volatile");
+    }
   }
-}
 
 // Make sure there is an abort when linking.
 //
 // I don't know why we need this, or why cortex-m doesn't seem to have it.
 #[cfg(any(target_arch = "riscv32", target_arch = "riscv64"))]
 global_asm!(
-    r#"
-.section .init
-.globl abort
-abort:
+  r#"
+  .section .init
+  .globl abort
+  abort:
   jal zero, _start
-"#
-);
+  "#
+  );

@@ -287,13 +287,15 @@ impl kernel::syscall::UserspaceKernelBoundary for SysCall {
         _done:
           nop
 
-
-          lw $0, 9*4($7)
-          lw $1, 10*4($7)
-          lw $2, 11*4($7)
-          lw $3, 12*4($7)
-          lw $4, 13*4($7)
-          lw $5, 32*4($7)
+          // We have to get the values that the app passed to us in registers
+          // (these are stored in RiscvimacStoredState) and copy them to
+          // registers so we can use them when returning to the kernel loop.
+          lw $0, 9*4($7)      // Fetch a0
+          lw $1, 10*4($7)     // Fetch a1
+          lw $2, 11*4($7)     // Fetch a2
+          lw $3, 12*4($7)     // Fetch a3
+          lw $4, 13*4($7)     // Fetch a4
+          lw $5, 1*4($7)      // Fetch sp
 
 
 
@@ -312,14 +314,16 @@ impl kernel::syscall::UserspaceKernelBoundary for SysCall {
         //     kernel::syscall::ContextSwitchReason::Fault
         //     )
 
+        let syscall = kernel::syscall::arguments_to_syscall(
+            syscall0 as u8, syscall1 as usize, syscall2 as usize, syscall3 as usize, syscall4 as usize);
+
+
+
         (
-            // newsp as *mut usize,
-            stack_pointer as *mut usize,
+            newsp as *mut usize,
             kernel::syscall::ContextSwitchReason::SyscallFired{
-                syscall: Some(kernel::syscall::Syscall::MEMOP {
-                operand: syscall1 as usize,
-                arg0: syscall2 as usize,
-            })}
+                syscall: syscall
+            }
             )
     }
 

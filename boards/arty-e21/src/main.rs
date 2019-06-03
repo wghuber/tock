@@ -186,17 +186,17 @@ pub unsafe fn reset_handler() {
             (
                 // Red
                 &arty_exx::gpio::PORT[0],
-                capsules::led::ActivationMode::ActiveLow
+                capsules::led::ActivationMode::ActiveHigh
             ),
             (
                 // Green
                 &arty_exx::gpio::PORT[1],
-                capsules::led::ActivationMode::ActiveLow
+                capsules::led::ActivationMode::ActiveHigh
             ),
             (
                 // Blue
                 &arty_exx::gpio::PORT[2],
-                capsules::led::ActivationMode::ActiveLow
+                capsules::led::ActivationMode::ActiveHigh
             ),
         ]
     );

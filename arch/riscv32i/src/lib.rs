@@ -301,41 +301,46 @@ global_asm!(
   _from_app:
 
   // Save the app registers to the StoredState array.
-  // Kernel SP was saved in mscratch, and stored state 
-  // pointer is on kernel stack
+  // Kernel stack pointer was saved in mscratch, and stored state
+  // pointer is on kernel stack.
   csrr t0, 0x340
-  lw t1, 30*4(t0) 
+  lw t1, 30*4(t0)
 
-  sw x1,0*4(t1)     
-  sw x3,1*4(t1)
-  sw x4,2*4(t1)
-  sw x5,3*4(t1)
-  sw x6,4*4(t1)
-  sw x7,5*4(t1)
-  sw x8,6*4(t1)
-  sw x9,7*4(t1)
-  sw x10,8*4(t1)
-  sw x11,9*4(t1)
-  sw x12,10*4(t1)
-  sw x13,11*4(t1)
-  sw x14,12*4(t1)
-  sw x15,13*4(t1)
-  sw x16,14*4(t1)
-  sw x17,15*4(t1)
-  sw x18,16*4(t1)
-  sw x19,17*4(t1)
-  sw x20,18*4(t1)
-  sw x21,19*4(t1)
-  sw x22,20*4(t1)
-  sw x23,21*4(t1)
-  sw x24,22*4(t1)
-  sw x25,23*4(t1)
-  sw x26,24*4(t1)
-  sw x27,25*4(t1)
-  sw x28,26*4(t1)
-  sw x29,27*4(t1)
-  sw x30,28*4(t1)
-  sw x31,29*4(t1)
+  // Need to save the excepting PC value. This will be stored in mepc.
+  csrr t0, 0x341              // CSR=0x341=mepc
+  sw   t0, 32*4(t1)           // Save the PC to the stored state struct
+
+  sw x1,0*4(t1)
+  sw x2,1*4(t1)
+  sw x3,2*4(t1)
+  sw x4,3*4(t1)
+  sw x5,4*4(t1)
+  sw x6,5*4(t1)
+  sw x7,6*4(t1)
+  sw x8,7*4(t1)
+  sw x9,8*4(t1)
+  sw x10,9*4(t1)
+  sw x11,10*4(t1)
+  sw x12,11*4(t1)
+  sw x13,12*4(t1)
+  sw x14,13*4(t1)
+  sw x15,14*4(t1)
+  sw x16,15*4(t1)
+  sw x17,16*4(t1)
+  sw x18,17*4(t1)
+  sw x19,18*4(t1)
+  sw x20,19*4(t1)
+  sw x21,20*4(t1)
+  sw x22,21*4(t1)
+  sw x23,22*4(t1)
+  sw x24,23*4(t1)
+  sw x25,24*4(t1)
+  sw x26,25*4(t1)
+  sw x27,26*4(t1)
+  sw x28,27*4(t1)
+  sw x29,28*4(t1)
+  sw x30,29*4(t1)
+  sw x31,30*4(t1)
 
   // Restore kernel sp and registers.
 

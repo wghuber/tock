@@ -23,6 +23,7 @@ extern "C" {
 /// This holds all of the state that the kernel must keep for the process when
 /// the process is not executing.
 #[derive(Copy, Clone, Default)]
+#[repr(C)]
 pub struct RiscvimacStoredState {
     regs: [usize; 32],
     pc: usize,
@@ -40,10 +41,10 @@ impl SysCall {
 impl kernel::syscall::UserspaceKernelBoundary for SysCall {
     type StoredState = RiscvimacStoredState;
 
-    /// Get the syscall that the process called.
-    unsafe fn get_syscall(&self, _stack_pointer: *const usize) -> Option<kernel::syscall::Syscall> {
-        None
-    }
+    // /// Get the syscall that the process called.
+    // unsafe fn get_syscall(&self, _stack_pointer: *const usize) -> Option<kernel::syscall::Syscall> {
+    //     None
+    // }
 
     unsafe fn set_syscall_return_value(&self, _stack_pointer: *const usize, _return_value: isize) {}
 
@@ -59,9 +60,21 @@ impl kernel::syscall::UserspaceKernelBoundary for SysCall {
         &self,
         stack_pointer: *const usize,
         _remaining_stack_memory: usize,
-        _callback: kernel::procs::FunctionCall,
-        _state: &RiscvimacStoredState,
+        callback: kernel::procs::FunctionCall,
+        state: &mut RiscvimacStoredState,
         ) -> Result<*mut usize, *mut usize> {
+
+        // Set the register state for the application when it starts
+        // executing. These are the argument registers.
+        state.regs[9] = callback.argument0;  // a0 = x10 = 9th saved register
+        state.regs[10] = callback.argument1; // a1 = x11 = 10th saved register
+        state.regs[11] = callback.argument2; // a2 = x12 = 11th saved register
+        state.regs[12] = callback.argument3; // a3 = x13 = 12th saved register
+
+        // Save the PC we expect to execute.
+        state.pc = callback.pc;
+
+        debug!("going to {:#x}", callback.pc);
 
         Ok(stack_pointer as *mut usize)
     }
@@ -72,12 +85,49 @@ impl kernel::syscall::UserspaceKernelBoundary for SysCall {
         _state: &mut RiscvimacStoredState,
         ) -> (*mut usize, kernel::syscall::ContextSwitchReason) {
 
-        let mut mstatus: u32;
-        mstatus = 0;
+        // let mut mstatus: u32;
+        // mstatus = 0;
+
+
+
+        //
+        //   :
+        //   :"r"(_state)
+        //   :
+        //   :"volatile");
+
+
+        // // Read current mstatus CSR and then modify it so we switch to
+        // // user mode when running the app.
+        // asm! (
+        //   csrr $0, 0x300  // Read mstatus CSR
+        //
+        //   : "=r" (mstatus)
+        //   :
+        //   :
+        //       : "volatile");
+
+        // // (read_csr(mstatus) &~ MSTATUS_MPP &~ MSTATUS_MIE) | MSTATUS_MPIE
+        // mstatus = (mstatus  & !0x00001800 & !0x00000008) | 0x00000080;
+        // // mstatus = 0x00000080;
+
+        // asm! (
+
+
+        let mut syscall0: u32;
+        let mut syscall1: u32;
+        let mut syscall2: u32;
+        let mut syscall3: u32;
+        let mut syscall4: u32;
+        let mut newsp: u32;
+
+
 
 
         asm! ("
-          // save kernel registers, and sp in mscratch (0x340)
+          // Save kernel registers to the kernel stack. Then save the stack
+          // pointer in mscratch (0x340) so we can retrieve it after returning
+          // to the kernel from the app.
 
           addi sp, sp, -31*4  // Move the stack pointer down to make room.
 
@@ -112,52 +162,70 @@ impl kernel::syscall::UserspaceKernelBoundary for SysCall {
           sw x30,28*4(sp)
           sw x31,29*4(sp)
 
-          sw $0, 30*4(sp)     // Store process state pointer on stack as well.
+          sw $7, 30*4(sp)     // Store process state pointer on stack as well.
 
           csrw 0x340, sp      // Save stack pointer in mscratch. This allows
                               // us to find it when the app returns back to
                               // the kernel.
-          "
-          :
-          :"r"(_state)
-          :
-          :"volatile");
+
+          // Read current mstatus CSR and then modify it so we switch to
+          // user mode when running the app.
+          csrr t0, 0x300      // Read mstatus=0x300 CSR
+          // Set the mode to user mode and set MPIE.
+          li   t1, 0x1808     // t1 = MSTATUS_MPP & MSTATUS_MIE
+          not  t1, t1         // t1 = ~(MSTATUS_MPP & MSTATUS_MIE)
+          and  t0, t0, t1     // t0 = mstatus & ~(MSTATUS_MPP & MSTATUS_MIE)
+          ori  t0, t0, 0x80   // t0 = t0 | MSTATUS_MPIE
 
 
-        // Read current mstatus CSR and then modify it so we switch to
-        // user mode when running the app.
-        asm! ("
-          csrr $0, 0x300  // Read mstatus CSR
-          "
-          : "=r" (mstatus)
-          :
-          :
-              : "volatile");
 
-        // (read_csr(mstatus) &~ MSTATUS_MPP &~ MSTATUS_MIE) | MSTATUS_MPIE
-        mstatus = (mstatus  & !0x00001800 & !0x00000008) | 0x00000080;
-        // mstatus = 0x00000080;
 
-        asm! ("
           // Write mstatus, write app location to mepc, load stack pointer,
           // set parameters.
-          csrw 0x300, $0     // Set mstatus CSR
-          csrw 0x341, $1     // Set mepc CSR. This is the PC we want to go to.
-          add x2, x0, $2     // Set sp register with app stack pointer.
-          li a0, 0x00000005  // Arg0: `void* app_start`
-          li a1, 0x00000006  // Arg1: `void* mem_start`
-          li a2, 0x00000007  // Arg2: `void* memory_len`
-          li a3, 0x00000008  // Arg3: `void* app_heap_break`
+          csrw 0x300, t0     // Set mstatus CSR
+          lw   t0, 32*4($7)  // Retrieve the PC from RiscvimacStoredState
+          csrw 0x341, t0     // Set mepc CSR. This is the PC we want to go to.
+          add x2, x0, $6     // Set sp register with app stack pointer.
+
+          lw x1, 0*4($7)
+          lw x3, 2*4($7)
+          lw x4, 3*4($7)
+          lw x5, 4*4($7)
+          lw x6, 5*4($7)
+          lw x7, 6*4($7)
+          lw x8, 7*4($7)
+          lw x9, 8*4($7)
+          lw x10, 9*4($7)  // a0
+          lw x11, 10*4($7) // a1
+          lw x12, 11*4($7) // a2
+          lw x13, 12*4($7) // a3
+          lw x14, 13*4($7)
+          lw x15, 14*4($7)
+          lw x16, 15*4($7)
+          lw x17, 16*4($7)
+          lw x18, 17*4($7)
+          lw x19, 18*4($7)
+          lw x20, 19*4($7)
+          lw x21, 20*4($7)
+          lw x22, 21*4($7)
+          lw x23, 22*4($7)
+          lw x24, 23*4($7)
+          lw x25, 24*4($7)
+          lw x26, 25*4($7)
+          lw x27, 26*4($7)
+          lw x28, 27*4($7)
+          lw x29, 28*4($7)
+          lw x30, 29*4($7)
+          lw x31, 30*4($7)
+
+          // Call mret to jump to where mepc points, switch to user mode, and
+          // start running the app.
           mret
-          "
-          :
-          : "r"(mstatus), "r"(0x40430060), "r"(stack_pointer)
-          : "a0", "a1", "a2", "a3"
-          : "volatile");
 
 
 
-        asm!("
+
+
         _return_to_kernel:
 
           // mcause is stored in mscratch at this point since we have exited
@@ -177,7 +245,7 @@ impl kernel::syscall::UserspaceKernelBoundary for SysCall {
 
         _check_ecall_umode:
           li    t1, 8             // 8 is the index of ECALL from U mode.
-          beq   t0, t1, _done     // Check if we did an ECALL and handle it correctly.
+          beq   t0, t1, _ecall     // Check if we did an ECALL and handle it correctly.
 
 
 
@@ -206,26 +274,52 @@ impl kernel::syscall::UserspaceKernelBoundary for SysCall {
           j _go_red
 
 
+        _ecall:
+          // Need to increment the PC so when we return we start at the correct
+          // instruction. The hardware does not do this for us.
+          lw   t0, 32*4($7)   // Get the PC from RiscvimacStoredState
+          addi t0, t0, 4      // Add 4 to increment the PC past ecall instruction
+          sw   t0, 32*4($7)   // Save the new PC back to RiscvimacStoredState
 
+          j _done
 
 
         _done:
           nop
 
 
+          lw $0, 9*4($7)
+          lw $1, 10*4($7)
+          lw $2, 11*4($7)
+          lw $3, 12*4($7)
+          lw $4, 13*4($7)
+          lw $5, 32*4($7)
+
+
 
           "
-          :
-          :
-          :
+          : "=r" (syscall0), "=r" (syscall1), "=r" (syscall2), "=r" (syscall3), "=r" (syscall4), "=r" (newsp)
+          : "r"(stack_pointer), "r"(_state)
+          : "a0", "a1", "a2", "a3"
           : "volatile");
 
 
-        debug!("yay!! wow does this actually print a lot or what??");
+        debug!("yay!! {:#x} {:#x} {:#x} {:#x} {:#x} {:#x}",
+            syscall0, syscall1, syscall2, syscall3, syscall4, newsp);
+
+        // (
+        //     newsp as *mut usize,
+        //     kernel::syscall::ContextSwitchReason::Fault
+        //     )
 
         (
+            // newsp as *mut usize,
             stack_pointer as *mut usize,
-            kernel::syscall::ContextSwitchReason::Fault,
+            kernel::syscall::ContextSwitchReason::SyscallFired{
+                syscall: Some(kernel::syscall::Syscall::MEMOP {
+                operand: syscall1 as usize,
+                arg0: syscall2 as usize,
+            })}
             )
     }
 

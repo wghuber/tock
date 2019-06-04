@@ -41,27 +41,20 @@ impl SysCall {
 impl kernel::syscall::UserspaceKernelBoundary for SysCall {
     type StoredState = RiscvimacStoredState;
 
-    // /// Get the syscall that the process called.
-    // unsafe fn get_syscall(&self, _stack_pointer: *const usize) -> Option<kernel::syscall::Syscall> {
-    //     None
-    // }
-
-    unsafe fn set_syscall_return_value(&self, _stack_pointer: *const usize, _return_value: isize) {}
-
-    unsafe fn pop_syscall_stack_frame(
+    unsafe fn set_syscall_return_value(
         &self,
-        stack_pointer: *const usize,
-        _state: &mut RiscvimacStoredState,
-        ) -> *mut usize {
-        stack_pointer as *mut usize
-    }
+        _stack_pointer: *const usize,
+        _state: &mut Self::StoredState,
+        _return_value: isize
+    ) {}
 
-    unsafe fn push_function_call(
+    unsafe fn set_process_function(
         &self,
         stack_pointer: *const usize,
         _remaining_stack_memory: usize,
-        callback: kernel::procs::FunctionCall,
         state: &mut RiscvimacStoredState,
+        callback: kernel::procs::FunctionCall,
+        _first_function: bool,
         ) -> Result<*mut usize, *mut usize> {
 
         // Set the register state for the application when it starts
@@ -318,13 +311,16 @@ impl kernel::syscall::UserspaceKernelBoundary for SysCall {
             syscall0 as u8, syscall1 as usize, syscall2 as usize, syscall3 as usize, syscall4 as usize);
 
 
+        let ret = match syscall {
+            Some(s) => kernel::syscall::ContextSwitchReason::SyscallFired{
+                syscall: s
+            },
+            None => kernel::syscall::ContextSwitchReason::Fault
+        };
 
-        (
-            newsp as *mut usize,
-            kernel::syscall::ContextSwitchReason::SyscallFired{
-                syscall: syscall
-            }
-            )
+
+
+        (newsp as *mut usize, ret)
     }
 
     unsafe fn fault_fmt(&self, writer: &mut Write) {}

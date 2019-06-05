@@ -47,7 +47,11 @@ impl kernel::syscall::UserspaceKernelBoundary for SysCall {
         state: &mut Self::StoredState,
         return_value: isize
     ) {
+        // Just need to put the return value in the a0 register for when the
+        // process resumes executing.
         state.regs[9] = return_value as usize; // a0 = x10 = 9th saved register = return value
+
+
         debug!("r:{:#x} to:{:#x} ra:{:#x}", state.regs[9], state.pc, state.regs[0]);
     }
 
@@ -98,44 +102,48 @@ impl kernel::syscall::UserspaceKernelBoundary for SysCall {
 
 
         asm! ("
-          // Save kernel registers to the kernel stack. Then save the stack
-          // pointer in mscratch (0x340) so we can retrieve it after returning
-          // to the kernel from the app.
+          // Before switching to the app we need to save the kernel registers to
+          // the kernel stack. We then save the stack pointer in the mscratch
+          // CSR (0x340) so we can retrieve it after returning to the kernel
+          // from the app.
 
           addi sp, sp, -31*4  // Move the stack pointer down to make room.
 
-          sw x1,0*4(sp)       // Save all of the registers on the kernel stack.
-          sw x3,1*4(sp)
-          sw x4,2*4(sp)
-          sw x5,3*4(sp)
-          sw x6,4*4(sp)
-          sw x7,5*4(sp)
-          sw x8,6*4(sp)
-          sw x9,7*4(sp)
-          sw x10,8*4(sp)
-          sw x11,9*4(sp)
-          sw x12,10*4(sp)
-          sw x13,11*4(sp)
-          sw x14,12*4(sp)
-          sw x15,13*4(sp)
-          sw x16,14*4(sp)
-          sw x17,15*4(sp)
-          sw x18,16*4(sp)
-          sw x19,17*4(sp)
-          sw x20,18*4(sp)
-          sw x21,19*4(sp)
-          sw x22,20*4(sp)
-          sw x23,21*4(sp)
-          sw x24,22*4(sp)
-          sw x25,23*4(sp)
-          sw x26,24*4(sp)
-          sw x27,25*4(sp)
-          sw x28,26*4(sp)
-          sw x29,27*4(sp)
-          sw x30,28*4(sp)
-          sw x31,29*4(sp)
+          sw   x1, 0*4(sp)    // Save all of the registers on the kernel stack.
+          sw   x3, 1*4(sp)
+          sw   x4, 2*4(sp)
+          sw   x5, 3*4(sp)
+          sw   x6, 4*4(sp)
+          sw   x7, 5*4(sp)
+          sw   x8, 6*4(sp)
+          sw   x9, 7*4(sp)
+          sw   x10, 8*4(sp)
+          sw   x11, 9*4(sp)
+          sw   x12, 10*4(sp)
+          sw   x13, 11*4(sp)
+          sw   x14, 12*4(sp)
+          sw   x15, 13*4(sp)
+          sw   x16, 14*4(sp)
+          sw   x17, 15*4(sp)
+          sw   x18, 16*4(sp)
+          sw   x19, 17*4(sp)
+          sw   x20, 18*4(sp)
+          sw   x21, 19*4(sp)
+          sw   x22, 20*4(sp)
+          sw   x23, 21*4(sp)
+          sw   x24, 22*4(sp)
+          sw   x25, 23*4(sp)
+          sw   x26, 24*4(sp)
+          sw   x27, 25*4(sp)
+          sw   x28, 26*4(sp)
+          sw   x29, 27*4(sp)
+          sw   x30, 28*4(sp)
+          sw   x31, 29*4(sp)
 
           sw $7, 30*4(sp)     // Store process state pointer on stack as well.
+                              // We need to have the available for after the app
+                              // returns to the kernel so we can store its
+                              // registers.
 
           csrw 0x340, sp      // Save stack pointer in mscratch. This allows
                               // us to find it when the app returns back to
@@ -149,47 +157,53 @@ impl kernel::syscall::UserspaceKernelBoundary for SysCall {
           not  t1, t1         // t1 = ~(MSTATUS_MPP & MSTATUS_MIE)
           and  t0, t0, t1     // t0 = mstatus & ~(MSTATUS_MPP & MSTATUS_MIE)
           ori  t0, t0, 0x80   // t0 = t0 | MSTATUS_MPIE
+          csrw 0x300, t0      // Set mstatus CSR so that we switch to user mode.
 
+          // We have to set the mepc CSR with the PC we want the app to start
+          // executing at. This has been saved in RiscvimacStoredState for us
+          // (either when the app returned back to the kernel or in the
+          // `set_process_function()` function).
+          lw   t0, 32*4($7)   // Retrieve the PC from RiscvimacStoredState
+          csrw 0x341, t0      // Set mepc CSR. This is the PC we want to go to.
 
+          // Setup the stack pointer for the application.
+          add  x2, x0, $6     // Set sp register with app stack pointer.
 
-
-          // Write mstatus, write app location to mepc, load stack pointer,
-          // set parameters.
-          csrw 0x300, t0     // Set mstatus CSR
-          lw   t0, 32*4($7)  // Retrieve the PC from RiscvimacStoredState
-          csrw 0x341, t0     // Set mepc CSR. This is the PC we want to go to.
-          add x2, x0, $6     // Set sp register with app stack pointer.
-
-          lw x1, 0*4($7)
-          lw x3, 2*4($7)
-          lw x4, 3*4($7)
-          lw x5, 4*4($7)
-          lw x6, 5*4($7)
-          lw x7, 6*4($7)
-          lw x8, 7*4($7)
-          lw x9, 8*4($7)
-          lw x10, 9*4($7)  // a0
-          lw x11, 10*4($7) // a1
-          lw x12, 11*4($7) // a2
-          lw x13, 12*4($7) // a3
-          lw x14, 13*4($7)
-          lw x15, 14*4($7)
-          lw x16, 15*4($7)
-          lw x17, 16*4($7)
-          lw x18, 17*4($7)
-          lw x19, 18*4($7)
-          lw x20, 19*4($7)
-          lw x21, 20*4($7)
-          lw x22, 21*4($7)
-          lw x23, 22*4($7)
-          lw x24, 23*4($7)
-          lw x25, 24*4($7)
-          lw x26, 25*4($7)
-          lw x27, 26*4($7)
-          lw x28, 27*4($7)
-          lw x29, 28*4($7)
-          lw x30, 29*4($7)
-          lw x31, 30*4($7)
+          // Restore all of the app registers from what we saved. If this is the
+          // first time running the app then most of these values are
+          // irrelevant, However we do need to set the four arguments to the
+          // `_start_ function in the app. If the app has been executing then this
+          // allows the app to correctly resume.
+          lw   x1, 0*4($7)
+          lw   x3, 2*4($7)
+          lw   x4, 3*4($7)
+          lw   x5, 4*4($7)
+          lw   x6, 5*4($7)
+          lw   x7, 6*4($7)
+          lw   x8, 7*4($7)
+          lw   x9, 8*4($7)
+          lw   x10, 9*4($7)   // a0
+          lw   x11, 10*4($7)  // a1
+          lw   x12, 11*4($7)  // a2
+          lw   x13, 12*4($7)  // a3
+          lw   x14, 13*4($7)
+          lw   x15, 14*4($7)
+          lw   x16, 15*4($7)
+          lw   x17, 16*4($7)
+          lw   x18, 17*4($7)
+          lw   x19, 18*4($7)
+          lw   x20, 19*4($7)
+          lw   x21, 20*4($7)
+          lw   x22, 21*4($7)
+          lw   x23, 22*4($7)
+          lw   x24, 23*4($7)
+          lw   x25, 24*4($7)
+          lw   x26, 25*4($7)
+          lw   x27, 26*4($7)
+          lw   x28, 27*4($7)
+          lw   x29, 28*4($7)
+          lw   x30, 29*4($7)
+          lw   x31, 30*4($7)
 
           // Call mret to jump to where mepc points, switch to user mode, and
           // start running the app.
@@ -198,27 +212,35 @@ impl kernel::syscall::UserspaceKernelBoundary for SysCall {
 
 
 
-
+          // This is where the trap handler jumps back to after the app stops
+          // executing.
         _return_to_kernel:
 
-          // mcause is stored in mscratch at this point since we have exited
-          // the fault handler.
-          csrr t0, 0x340              // CSR=0x340=mscratch
+          // We can read mcause out of the mscratch CSR because the trap handler
+          // stored it there for us. We need to use mcause to determine why the
+          // app stopped executing and handle it appropriately.
+          csrr t0, 0x340      // CSR=0x340=mscratch
           // If mcause < 0 then we encountered an interrupt.
           blt  t0, x0, _app_interrupt // If negative, this was an interrupt.
 
 
           // Check the various exception codes and handle them properly.
 
-          andi  t0, t0, 0x1ff         // `and` mcause with 9 lower bits of zero
-                                      // to mask off just the cause. This is
-                                      // needed because the E21 core uses
-                                      // several of the upper bits for other
-                                      // flags.
+          andi  t0, t0, 0x1ff // `and` mcause with 9 lower bits of zero
+                              // to mask off just the cause. This is needed
+                              // because the E21 core uses several of the upper
+                              // bits for other flags.
 
         _check_ecall_umode:
-          li    t1, 8             // 8 is the index of ECALL from U mode.
-          beq   t0, t1, _ecall     // Check if we did an ECALL and handle it correctly.
+          li    t1, 8          // 8 is the index of ECALL from U mode.
+          beq   t0, t1, _ecall // Check if we did an ECALL and handle it
+                               // correctly.
+
+
+          // ~~
+          // other exception checks go here
+          // ~~
+
 
 
 
@@ -258,8 +280,6 @@ impl kernel::syscall::UserspaceKernelBoundary for SysCall {
 
 
         _done:
-          nop
-
           // We have to get the values that the app passed to us in registers
           // (these are stored in RiscvimacStoredState) and copy them to
           // registers so we can use them when returning to the kernel loop.
@@ -279,7 +299,7 @@ impl kernel::syscall::UserspaceKernelBoundary for SysCall {
           : "volatile");
 
 
-        debug!("yay!! {:#x} {:#x} {:#x} {:#x} {:#x} {:#x}",
+        debug!("syscall: {:#x} {:#x} {:#x} {:#x} {:#x} {:#x}",
             syscall0, syscall1, syscall2, syscall3, syscall4, newsp);
 
         // (

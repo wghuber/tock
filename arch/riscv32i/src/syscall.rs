@@ -46,7 +46,9 @@ impl kernel::syscall::UserspaceKernelBoundary for SysCall {
         _stack_pointer: *const usize,
         _state: &mut Self::StoredState,
         _return_value: isize
-    ) {}
+    ) {
+        _state.regs[9] = _return_value; // a0 = return value
+    }
 
     unsafe fn set_process_function(
         &self,
@@ -64,6 +66,14 @@ impl kernel::syscall::UserspaceKernelBoundary for SysCall {
         state.regs[11] = callback.argument2; // a2 = x12 = 11th saved register
         state.regs[12] = callback.argument3; // a3 = x13 = 12th saved register
 
+        asm! (
+          csrr $0, 0x341  //Read mepc into return address (ra) register
+        
+          : "=r" (state.regs[1])
+          :
+          :
+              : "volatile"); 
+
         // Save the PC we expect to execute.
         state.pc = callback.pc;
 
@@ -78,43 +88,12 @@ impl kernel::syscall::UserspaceKernelBoundary for SysCall {
         _state: &mut RiscvimacStoredState,
         ) -> (*mut usize, kernel::syscall::ContextSwitchReason) {
 
-        // let mut mstatus: u32;
-        // mstatus = 0;
-
-
-
-        //
-        //   :
-        //   :"r"(_state)
-        //   :
-        //   :"volatile");
-
-
-        // // Read current mstatus CSR and then modify it so we switch to
-        // // user mode when running the app.
-        // asm! (
-        //   csrr $0, 0x300  // Read mstatus CSR
-        //
-        //   : "=r" (mstatus)
-        //   :
-        //   :
-        //       : "volatile");
-
-        // // (read_csr(mstatus) &~ MSTATUS_MPP &~ MSTATUS_MIE) | MSTATUS_MPIE
-        // mstatus = (mstatus  & !0x00001800 & !0x00000008) | 0x00000080;
-        // // mstatus = 0x00000080;
-
-        // asm! (
-
-
         let mut syscall0: u32;
         let mut syscall1: u32;
         let mut syscall2: u32;
         let mut syscall3: u32;
         let mut syscall4: u32;
         let mut newsp: u32;
-
-
 
 
         asm! ("

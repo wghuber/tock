@@ -44,10 +44,11 @@ impl kernel::syscall::UserspaceKernelBoundary for SysCall {
     unsafe fn set_syscall_return_value(
         &self,
         _stack_pointer: *const usize,
-        _state: &mut Self::StoredState,
-        _return_value: isize
+        state: &mut Self::StoredState,
+        return_value: isize
     ) {
-        _state.regs[9] = _return_value; // a0 = return value
+        state.regs[9] = return_value as usize; // a0 = x10 = 9th saved register = return value
+        debug!("r:{:#x} to:{:#x} ra:{:#x}", state.regs[9], state.pc, state.regs[0]);
     }
 
     unsafe fn set_process_function(
@@ -56,7 +57,7 @@ impl kernel::syscall::UserspaceKernelBoundary for SysCall {
         _remaining_stack_memory: usize,
         state: &mut RiscvimacStoredState,
         callback: kernel::procs::FunctionCall,
-        _first_function: bool,
+        first_function: bool,
         ) -> Result<*mut usize, *mut usize> {
 
         // Set the register state for the application when it starts
@@ -66,18 +67,18 @@ impl kernel::syscall::UserspaceKernelBoundary for SysCall {
         state.regs[11] = callback.argument2; // a2 = x12 = 11th saved register
         state.regs[12] = callback.argument3; // a3 = x13 = 12th saved register
 
-        asm! (
-          csrr $0, 0x341  //Read mepc into return address (ra) register
-        
-          : "=r" (state.regs[1])
-          :
-          :
-              : "volatile"); 
+        // We also need to set the return address (ra) register so that the
+        // new function that the process is running returns to the correct
+        // location. However, if this is the first time the process is running
+        // then there is nothing to return to so we skip this.
+        if !first_function {
+            state.regs[0] = state.pc;        // ra = x1 = 1st saved register
+        }
 
         // Save the PC we expect to execute.
         state.pc = callback.pc;
 
-        debug!("going to {:#x}", callback.pc);
+        debug!("going to {:#x}, ra: {:#x}", callback.pc, state.regs[0]);
 
         Ok(stack_pointer as *mut usize)
     }

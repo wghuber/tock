@@ -92,7 +92,7 @@ impl kernel::syscall::UserspaceKernelBoundary for SysCall {
         stack_pointer: *const usize,
         _state: &mut RiscvimacStoredState,
         ) -> (*mut usize, kernel::syscall::ContextSwitchReason) {
-
+        let mut app_interrupt: u32;
         let mut syscall0: u32;
         let mut syscall1: u32;
         let mut syscall2: u32;
@@ -241,19 +241,17 @@ impl kernel::syscall::UserspaceKernelBoundary for SysCall {
           // other exception checks go here
           // ~~
 
+         
+          // An interrupt occurred while the app was running.
+          // TODO
+        _app_interrupt:
+          li $0, 1      //set app_interrupt to 1   
+          j _ecall
 
 
 
           // Fall through to error.
           j _go_red
-
-
-
-          // An interrupt occurred while the app was running.
-          // TODO
-        _app_interrupt:
-          nop
-
 
           // Stop here if we get here. This means there was some other exception that
           // we are not handling. The red LED will come on.
@@ -267,6 +265,7 @@ impl kernel::syscall::UserspaceKernelBoundary for SysCall {
           li t6, 0x1
           sw t6, 0(t5)
           j _go_red
+       
 
 
         _ecall:
@@ -283,17 +282,16 @@ impl kernel::syscall::UserspaceKernelBoundary for SysCall {
           // We have to get the values that the app passed to us in registers
           // (these are stored in RiscvimacStoredState) and copy them to
           // registers so we can use them when returning to the kernel loop.
-          lw $0, 9*4($7)      // Fetch a0
-          lw $1, 10*4($7)     // Fetch a1
-          lw $2, 11*4($7)     // Fetch a2
-          lw $3, 12*4($7)     // Fetch a3
-          lw $4, 13*4($7)     // Fetch a4
-          lw $5, 1*4($7)      // Fetch sp
-
+          lw $1, 9*4($7)      // Fetch a0
+          lw $2, 10*4($7)     // Fetch a1
+          lw $3, 11*4($7)     // Fetch a2
+          lw $4, 12*4($7)     // Fetch a3
+          lw $5, 13*4($7)     // Fetch a4
+          lw $6, 1*4($7)      // Fetch sp
 
 
           "
-          : "=r" (syscall0), "=r" (syscall1), "=r" (syscall2), "=r" (syscall3), "=r" (syscall4), "=r" (newsp)
+          : "=r"(app_interrupt), "=r" (syscall0), "=r" (syscall1), "=r" (syscall2), "=r" (syscall3), "=r" (syscall4), "=r" (newsp)
           : "r"(stack_pointer), "r"(_state)
           : "a0", "a1", "a2", "a3"
           : "volatile");
@@ -310,14 +308,26 @@ impl kernel::syscall::UserspaceKernelBoundary for SysCall {
         let syscall = kernel::syscall::arguments_to_syscall(
             syscall0 as u8, syscall1 as usize, syscall2 as usize, syscall3 as usize, syscall4 as usize);
 
-
-        let ret = match syscall {
+        let mut ret: kernel::syscall::ContextSwitchReason;
+        if (app_interrupt == 1){
+            ret = kernel::syscall::ContextSwitchReason::Interrupted;
+            app_interrupt = 0;
+        }
+        // else if(syscall.is_some()){
+        //     ret = kernel::syscall::ContextSwitchReason::SyscallFired{syscall: syscall};
+        // }
+        // else{
+        //     ret = kernel::syscall::ContextSwitchReason::Fault;
+        // }
+        else{
+            ret = match syscall {
             Some(s) => kernel::syscall::ContextSwitchReason::SyscallFired{
                 syscall: s
             },
             None => kernel::syscall::ContextSwitchReason::Fault
         };
 
+        }
 
 
         (newsp as *mut usize, ret)

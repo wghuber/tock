@@ -140,7 +140,7 @@ impl kernel::syscall::UserspaceKernelBoundary for SysCall {
           sw   x30, 28*4(sp)
           sw   x31, 29*4(sp)
 
-          sw $7, 30*4(sp)     // Store process state pointer on stack as well.
+          sw $8, 30*4(sp)     // Store process state pointer on stack as well.
                               // We need to have the available for after the app
                               // returns to the kernel so we can store its
                               // registers.
@@ -163,47 +163,47 @@ impl kernel::syscall::UserspaceKernelBoundary for SysCall {
           // executing at. This has been saved in RiscvimacStoredState for us
           // (either when the app returned back to the kernel or in the
           // `set_process_function()` function).
-          lw   t0, 32*4($7)   // Retrieve the PC from RiscvimacStoredState
+          lw   t0, 32*4($8)   // Retrieve the PC from RiscvimacStoredState
           csrw 0x341, t0      // Set mepc CSR. This is the PC we want to go to.
 
           // Setup the stack pointer for the application.
-          add  x2, x0, $6     // Set sp register with app stack pointer.
+          add  x2, x0, $7     // Set sp register with app stack pointer.
 
           // Restore all of the app registers from what we saved. If this is the
           // first time running the app then most of these values are
           // irrelevant, However we do need to set the four arguments to the
           // `_start_ function in the app. If the app has been executing then this
           // allows the app to correctly resume.
-          lw   x1, 0*4($7)
-          lw   x3, 2*4($7)
-          lw   x4, 3*4($7)
-          lw   x5, 4*4($7)
-          lw   x6, 5*4($7)
-          lw   x7, 6*4($7)
-          lw   x8, 7*4($7)
-          lw   x9, 8*4($7)
-          lw   x10, 9*4($7)   // a0
-          lw   x11, 10*4($7)  // a1
-          lw   x12, 11*4($7)  // a2
-          lw   x13, 12*4($7)  // a3
-          lw   x14, 13*4($7)
-          lw   x15, 14*4($7)
-          lw   x16, 15*4($7)
-          lw   x17, 16*4($7)
-          lw   x18, 17*4($7)
-          lw   x19, 18*4($7)
-          lw   x20, 19*4($7)
-          lw   x21, 20*4($7)
-          lw   x22, 21*4($7)
-          lw   x23, 22*4($7)
-          lw   x24, 23*4($7)
-          lw   x25, 24*4($7)
-          lw   x26, 25*4($7)
-          lw   x27, 26*4($7)
-          lw   x28, 27*4($7)
-          lw   x29, 28*4($7)
-          lw   x30, 29*4($7)
-          lw   x31, 30*4($7)
+          lw   x1, 0*4($8)
+          lw   x3, 2*4($8)
+          lw   x4, 3*4($8)
+          lw   x5, 4*4($8)
+          lw   x6, 5*4($8)
+          lw   x7, 6*4($8)
+          lw   x8, 7*4($8)
+          lw   x9, 8*4($8)
+          lw   x10, 9*4($8)   // a0
+          lw   x11, 10*4($8)  // a1
+          lw   x12, 11*4($8)  // a2
+          lw   x13, 12*4($8)  // a3
+          lw   x14, 13*4($8)
+          lw   x15, 14*4($8)
+          lw   x16, 15*4($8)
+          lw   x17, 16*4($8)
+          lw   x18, 17*4($8)
+          lw   x19, 18*4($8)
+          lw   x20, 19*4($8)
+          lw   x21, 20*4($8)
+          lw   x22, 21*4($8)
+          lw   x23, 22*4($8)
+          lw   x24, 23*4($8)
+          lw   x25, 24*4($8)
+          lw   x26, 25*4($8)
+          lw   x27, 26*4($8)
+          lw   x28, 27*4($8)
+          lw   x29, 28*4($8)
+          lw   x30, 29*4($8)
+          lw   x31, 30*4($8)
 
           // Call mret to jump to where mepc points, switch to user mode, and
           // start running the app.
@@ -233,7 +233,7 @@ impl kernel::syscall::UserspaceKernelBoundary for SysCall {
 
         _check_ecall_umode:
           li    t1, 8          // 8 is the index of ECALL from U mode.
-          beq   t0, t1, _ecall // Check if we did an ECALL and handle it
+          beq   t0, t1, _done // Check if we did an ECALL and handle it
                                // correctly.
 
 
@@ -267,27 +267,31 @@ impl kernel::syscall::UserspaceKernelBoundary for SysCall {
           j _go_red
        
 
-
-        _ecall:
-          // Need to increment the PC so when we return we start at the correct
-          // instruction. The hardware does not do this for us.
-          lw   t0, 32*4($7)   // Get the PC from RiscvimacStoredState
-          addi t0, t0, 4      // Add 4 to increment the PC past ecall instruction
-          sw   t0, 32*4($7)   // Save the new PC back to RiscvimacStoredState
-
-          j _done
-
-
         _done:
           // We have to get the values that the app passed to us in registers
           // (these are stored in RiscvimacStoredState) and copy them to
           // registers so we can use them when returning to the kernel loop.
-          lw $1, 9*4($7)      // Fetch a0
-          lw $2, 10*4($7)     // Fetch a1
-          lw $3, 11*4($7)     // Fetch a2
-          lw $4, 12*4($7)     // Fetch a3
-          lw $5, 13*4($7)     // Fetch a4
-          lw $6, 1*4($7)      // Fetch sp
+          lw $1, 9*4($8)      // Fetch a0
+          lw $2, 10*4($8)     // Fetch a1
+          lw $3, 11*4($8)     // Fetch a2
+          lw $4, 12*4($8)     // Fetch a3
+          lw $5, 13*4($8)     // Fetch a4
+          lw $6, 1*4($8)      // Fetch sp
+
+          j _ecall
+
+
+        _ecall:
+          // Need to increment the PC so when we return we start at the correct
+          // instruction. The hardware does not do this for us.
+          lw   t0, 32*4($8)   // Get the PC from RiscvimacStoredState
+          addi t0, t0, 4      // Add 4 to increment the PC past ecall instruction
+          sw   t0, 32*4($8)   // Save the new PC back to RiscvimacStoredState
+
+          //j _done
+
+
+
 
 
           "

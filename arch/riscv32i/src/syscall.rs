@@ -90,15 +90,14 @@ impl kernel::syscall::UserspaceKernelBoundary for SysCall {
     unsafe fn switch_to_process(
         &self,
         stack_pointer: *const usize,
-        _state: &mut RiscvimacStoredState,
+        state: &mut RiscvimacStoredState,
         ) -> (*mut usize, kernel::syscall::ContextSwitchReason) {
-        let mut switchReason: u32;
-        switchReason = 0;
-        let mut syscall0: u32;
-        let mut syscall1: u32;
-        let mut syscall2: u32;
-        let mut syscall3: u32;
-        let mut syscall4: u32;
+        let mut switch_reason: u32;
+        let mut syscall0: [u32; 5] = [0;5];
+        // let mut syscall1: u32;
+        // let mut syscall2: u32;
+        // let mut syscall3: u32;
+        // let mut syscall4: u32;
         let mut newsp: u32;
 
 
@@ -141,7 +140,7 @@ impl kernel::syscall::UserspaceKernelBoundary for SysCall {
           sw   x30, 28*4(sp)
           sw   x31, 29*4(sp)
 
-          sw $8, 30*4(sp)     // Store process state pointer on stack as well.
+          sw $4, 30*4(sp)     // Store process state pointer on stack as well.
                               // We need to have the available for after the app
                               // returns to the kernel so we can store its
                               // registers.
@@ -164,47 +163,47 @@ impl kernel::syscall::UserspaceKernelBoundary for SysCall {
           // executing at. This has been saved in RiscvimacStoredState for us
           // (either when the app returned back to the kernel or in the
           // `set_process_function()` function).
-          lw   t0, 32*4($8)   // Retrieve the PC from RiscvimacStoredState
+          lw   t0, 32*4($4)   // Retrieve the PC from RiscvimacStoredState
           csrw 0x341, t0      // Set mepc CSR. This is the PC we want to go to.
 
           // Setup the stack pointer for the application.
-          add  x2, x0, $7     // Set sp register with app stack pointer.
+          add  x2, x0, $3     // Set sp register with app stack pointer.
 
           // Restore all of the app registers from what we saved. If this is the
           // first time running the app then most of these values are
           // irrelevant, However we do need to set the four arguments to the
           // `_start_ function in the app. If the app has been executing then this
           // allows the app to correctly resume.
-          lw   x1, 0*4($8)
-          lw   x3, 2*4($8)
-          lw   x4, 3*4($8)
-          lw   x5, 4*4($8)
-          lw   x6, 5*4($8)
-          lw   x7, 6*4($8)
-          lw   x8, 7*4($8)
-          lw   x9, 8*4($8)
-          lw   x10, 9*4($8)   // a0
-          lw   x11, 10*4($8)  // a1
-          lw   x12, 11*4($8)  // a2
-          lw   x13, 12*4($8)  // a3
-          lw   x14, 13*4($8)
-          lw   x15, 14*4($8)
-          lw   x16, 15*4($8)
-          lw   x17, 16*4($8)
-          lw   x18, 17*4($8)
-          lw   x19, 18*4($8)
-          lw   x20, 19*4($8)
-          lw   x21, 20*4($8)
-          lw   x22, 21*4($8)
-          lw   x23, 22*4($8)
-          lw   x24, 23*4($8)
-          lw   x25, 24*4($8)
-          lw   x26, 25*4($8)
-          lw   x27, 26*4($8)
-          lw   x28, 27*4($8)
-          lw   x29, 28*4($8)
-          lw   x30, 29*4($8)
-          lw   x31, 30*4($8)
+          lw   x1, 0*4($4)
+          lw   x3, 2*4($4)
+          lw   x4, 3*4($4)
+          lw   x5, 4*4($4)
+          lw   x6, 5*4($4)
+          lw   x7, 6*4($4)
+          lw   x8, 7*4($4)
+          lw   x9, 8*4($4)
+          lw   x10, 9*4($4)   // a0
+          lw   x11, 10*4($4)  // a1
+          lw   x12, 11*4($4)  // a2
+          lw   x13, 12*4($4)  // a3
+          lw   x14, 13*4($4)
+          lw   x15, 14*4($4)
+          lw   x16, 15*4($4)
+          lw   x17, 16*4($4)
+          lw   x18, 17*4($4)
+          lw   x19, 18*4($4)
+          lw   x20, 19*4($4)
+          lw   x21, 20*4($4)
+          lw   x22, 21*4($4)
+          lw   x23, 22*4($4)
+          lw   x24, 23*4($4)
+          lw   x25, 24*4($4)
+          lw   x26, 25*4($4)
+          lw   x27, 26*4($4)
+          lw   x28, 27*4($4)
+          lw   x29, 28*4($4)
+          lw   x30, 29*4($4)
+          lw   x31, 30*4($4)
 
           // Call mret to jump to where mepc points, switch to user mode, and
           // start running the app.
@@ -234,114 +233,120 @@ impl kernel::syscall::UserspaceKernelBoundary for SysCall {
 
         _check_ecall_umode:
           li    t1, 8          // 8 is the index of ECALL from U mode.
-          beq   t0, t1, _done // Check if we did an ECALL and handle it
+          beq   t0, t1, _ecall // Check if we did an ECALL and handle it
                                // correctly.
 
+        _check_exception:
+          li    $0, 2         // If we get here, the only other option is an
+          j     _done         // exception happened. We don't differentiate.
 
-          // ~~
-          // other exception checks go here
-          // ~~
-            
-         
-          // An interrupt occurred while the app was running.
-          // TODO
+
         _app_interrupt:
-          // li $0, 1      //set app_interrupt to 1   
-          j _ecall
-
-
-        // _some_other_exception:
-        //   li $0, 2      //set app_interrupt to 1   
-        //   j _ecall
-
-
-          // Fall through to error.
-          j _go_red
-
-          // Stop here if we get here. This means there was some other exception that
-          // we are not handling. The red LED will come on.
-        _go_red:
-          lui t5, 0x20002
-          addi t5, t5, 0x00000008
-          li t6, 0x00000007
-          sw t6, 0(t5)
-          lui t5, 0x20002
-          addi t5, t5, 0x0000000c
-          li t6, 0x1
-          sw t6, 0(t5)
-          j _go_red
-       
-
-        _done:
-          // We have to get the values that the app passed to us in registers
-          // (these are stored in RiscvimacStoredState) and copy them to
-          // registers so we can use them when returning to the kernel loop.
-          lw $1, 9*4($8)      // Fetch a0
-          lw $2, 10*4($8)     // Fetch a1
-          lw $3, 11*4($8)     // Fetch a2
-          lw $4, 12*4($8)     // Fetch a3
-          lw $5, 13*4($8)     // Fetch a4
-          lw $6, 1*4($8)      // Fetch sp
-
-          j _ecall
+          li   $0, 1          // Mark that an interrupt occurred while the app
+                              // was running.
+          j    _done
 
 
         _ecall:
+          li   $0, 0          // Mark that the process did a syscall.
           // Need to increment the PC so when we return we start at the correct
           // instruction. The hardware does not do this for us.
-          lw   t0, 32*4($8)   // Get the PC from RiscvimacStoredState
+          lw   t0, 32*4($4)   // Get the PC from RiscvimacStoredState
           addi t0, t0, 4      // Add 4 to increment the PC past ecall instruction
-          sw   t0, 32*4($8)   // Save the new PC back to RiscvimacStoredState
+          sw   t0, 32*4($4)   // Save the new PC back to RiscvimacStoredState
 
-          //j _done
+          // We have to get the values that the app passed to us in registers
+          // (these are stored in RiscvimacStoredState) and copy them to
+          // registers so we can use them when returning to the kernel loop.
+          lw   t0, 9*4($4)      // Fetch a0
+          sw   t0, 0*4($1)
+          lw   t0, 10*4($4)     // Fetch a1
+          sw   t0, 1*4($1)
+          lw   t0, 11*4($4)     // Fetch a2
+          sw   t0, 2*4($1)
+          lw   t0, 12*4($4)     // Fetch a3
+          sw   t0, 3*4($1)
+          lw   t0, 13*4($4)     // Fetch a4
+          sw   t0, 4*4($1)
+          lw   $2, 1*4($4)      // Fetch sp
 
 
-
+        _done:
+          nop
 
 
           "
-          : "=r"(switchReason), "=r" (syscall0), "=r" (syscall1), "=r" (syscall2), "=r" (syscall3), "=r" (syscall4), "=r" (newsp)
-          : "r"(stack_pointer), "r"(_state)
+          // : "=r"(switch_reason), "=r" (&syscall), "=r" (syscall1), "=r" (syscall2), "=r" (syscall3), "=r" (syscall4), "=r" (newsp)
+          : "=r"(switch_reason), "=r" (&mut syscall0), "=r" (newsp)
+          : "r"(stack_pointer), "r"(state)
           : "a0", "a1", "a2", "a3"
           : "volatile");
 
 
         debug!("syscall: {:#x} {:#x} {:#x} {:#x} {:#x} {:#x}",
-            syscall0, syscall1, syscall2, syscall3, syscall4, newsp);
+            syscall0[0], syscall0[1], syscall0[2], syscall0[3], syscall0[4], newsp);
 
         // (
         //     newsp as *mut usize,
         //     kernel::syscall::ContextSwitchReason::Fault
         //     )
 
-        let syscall = kernel::syscall::arguments_to_syscall(
-            syscall0 as u8, syscall1 as usize, syscall2 as usize, syscall3 as usize, syscall4 as usize);
 
-        let mut ret: kernel::syscall::ContextSwitchReason;
-        if (switchReason == 1){
-            //debug_gpio!(1, set);
-            ret = kernel::syscall::ContextSwitchReason::Interrupted;
-            switchReason = 0;
-        }
-        else if (switchReason == 2){
-            ret = kernel::syscall::ContextSwitchReason::Fault;
-            switchReason = 0;
-        }
-        // // else if(syscall.is_some()){
-        //     ret = kernel::syscall::ContextSwitchReason::SyscallFired{syscall: syscall};
-        // }
-        // else{
-        //     ret = kernel::syscall::ContextSwitchReason::Fault;
-        // }
-        else{
-            ret = match syscall {
-            Some(s) => kernel::syscall::ContextSwitchReason::SyscallFired{
-                syscall: s
-            },
-            None => kernel::syscall::ContextSwitchReason::Fault
+        // Prepare the return type that marks why the app stopped executing.
+        let ret = match switch_reason {
+            0 => {
+                let syscall = kernel::syscall::arguments_to_syscall(
+                    // state.regs[9] as u8,
+                    syscall0[0] as u8,
+                    syscall0[1] as usize,
+                    syscall0[2] as usize,
+                    syscall0[3] as usize,
+                    syscall0[4] as usize);
+                match syscall {
+                    Some(s) => kernel::syscall::ContextSwitchReason::SyscallFired{
+                        syscall: s
+                    },
+                    None => kernel::syscall::ContextSwitchReason::Fault
+                }
+
+            }
+            1 => kernel::syscall::ContextSwitchReason::Interrupted,
+            2 => kernel::syscall::ContextSwitchReason::Fault,
+            _ => kernel::syscall::ContextSwitchReason::Fault,
         };
 
-        }
+
+
+
+
+
+
+
+        // let mut ret: kernel::syscall::ContextSwitchReason;
+        // if (switchReason == 1){
+        //     //debug_gpio!(1, set);
+        //     ret = kernel::syscall::ContextSwitchReason::Interrupted;
+        //     switchReason = 0;
+        // }
+        // else if (switchReason == 2){
+        //     ret = kernel::syscall::ContextSwitchReason::Fault;
+        //     switchReason = 0;
+        // }
+        // // // else if(syscall.is_some()){
+        // //     ret = kernel::syscall::ContextSwitchReason::SyscallFired{syscall: syscall};
+        // // }
+        // // else{
+        // //     ret = kernel::syscall::ContextSwitchReason::Fault;
+        // // }
+        // else{
+        //     ret = match syscall {
+        //     Some(s) => kernel::syscall::ContextSwitchReason::SyscallFired{
+        //         syscall: s
+        //     },
+        //     None => kernel::syscall::ContextSwitchReason::Fault
+        // };
+
+        // }
 
 
         (newsp as *mut usize, ret)

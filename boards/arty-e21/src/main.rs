@@ -88,8 +88,9 @@ impl Platform for ArtyE21 {
 pub unsafe fn reset_handler() {
     // Basic setup of the platform.
     riscv32i::init_memory();
-    riscv32i::configure_trap_handler();
 
+    let chip = static_init!(arty_exx::chip::ArtyExx, arty_exx::chip::ArtyExx::new());
+    chip.initialize();
 
     let process_mgmt_cap = create_capability!(capabilities::ProcessManagementCapability);
     let main_loop_cap = create_capability!(capabilities::MainLoopCapability);
@@ -104,7 +105,7 @@ pub unsafe fn reset_handler() {
         Some(&arty_exx::gpio::PORT[8]),
     );
 
-    let chip = static_init!(arty_exx::chip::ArtyExx, arty_exx::chip::ArtyExx::new());
+
 
     // Create a shared UART channel for the console and for kernel debug.
     let uart_mux = static_init!(

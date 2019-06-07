@@ -240,9 +240,8 @@ impl kernel::syscall::UserspaceKernelBoundary for SysCall {
           // state struct.
           lw   t0, 30*4(sp) // Load the stored state pointer into t0.
 
-          // Store all of the callee saved registers to the stored state
-          // struct. We also save a0-a4 since we use those as syscall
-          // arguments.
+          // Store all of the callee saved registers to the stored state struct.
+          // We also save a0-a4 since we use those as syscall arguments.
           sw   ra,   0*4(t0) // Save ra
           sw   a0,   2*4(t0) // Save a0-a4
           sw   a1,   3*4(t0)
@@ -371,14 +370,6 @@ impl kernel::syscall::UserspaceKernelBoundary for SysCall {
             new_stack_pointer, switch_reason);
 
 
-        // debug!("syscall: {:#x} {:#x} {:#x} {:#x} {:#x} {:#x} {:#x}",
-        //     aaaa[0], aaaa[1], aaaa[2], aaaa[3], aaaa[4], newsp, switch_reason);
-
-        // debug!("syscall: {:#x} {:#x} {:#x} {:#x} {:#x} {:#x} {:#x}",
-        //     syscall0, 1,1,1,1, newsp, switch_reason);
-
-
-
 
         // Prepare the return type that marks why the app stopped executing.
         let ret = match switch_reason {
@@ -401,40 +392,6 @@ impl kernel::syscall::UserspaceKernelBoundary for SysCall {
             2 => kernel::syscall::ContextSwitchReason::Fault,
             _ => kernel::syscall::ContextSwitchReason::Fault,
         };
-
-
-
-
-
-
-
-
-        // let mut ret: kernel::syscall::ContextSwitchReason;
-        // if (switchReason == 1){
-        //     //debug_gpio!(1, set);
-        //     ret = kernel::syscall::ContextSwitchReason::Interrupted;
-        //     switchReason = 0;
-        // }
-        // else if (switchReason == 2){
-        //     ret = kernel::syscall::ContextSwitchReason::Fault;
-        //     switchReason = 0;
-        // }
-        // // // else if(syscall.is_some()){
-        // //     ret = kernel::syscall::ContextSwitchReason::SyscallFired{syscall: syscall};
-        // // }
-        // // else{
-        // //     ret = kernel::syscall::ContextSwitchReason::Fault;
-        // // }
-        // else{
-        //     ret = match syscall {
-        //     Some(s) => kernel::syscall::ContextSwitchReason::SyscallFired{
-        //         syscall: s
-        //     },
-        //     None => kernel::syscall::ContextSwitchReason::Fault
-        // };
-
-        // }
-
 
         (new_stack_pointer as *mut usize, ret)
     }

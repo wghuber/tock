@@ -92,7 +92,8 @@ impl kernel::syscall::UserspaceKernelBoundary for SysCall {
         stack_pointer: *const usize,
         _state: &mut RiscvimacStoredState,
         ) -> (*mut usize, kernel::syscall::ContextSwitchReason) {
-        let mut app_interrupt: u32;
+        let mut switchReason: u32;
+        switchReason = 0;
         let mut syscall0: u32;
         let mut syscall1: u32;
         let mut syscall2: u32;
@@ -240,14 +241,18 @@ impl kernel::syscall::UserspaceKernelBoundary for SysCall {
           // ~~
           // other exception checks go here
           // ~~
-
+            
          
           // An interrupt occurred while the app was running.
           // TODO
         _app_interrupt:
-          li $0, 1      //set app_interrupt to 1   
+          // li $0, 1      //set app_interrupt to 1   
           j _ecall
 
+
+        // _some_other_exception:
+        //   li $0, 2      //set app_interrupt to 1   
+        //   j _ecall
 
 
           // Fall through to error.
@@ -295,7 +300,7 @@ impl kernel::syscall::UserspaceKernelBoundary for SysCall {
 
 
           "
-          : "=r"(app_interrupt), "=r" (syscall0), "=r" (syscall1), "=r" (syscall2), "=r" (syscall3), "=r" (syscall4), "=r" (newsp)
+          : "=r"(switchReason), "=r" (syscall0), "=r" (syscall1), "=r" (syscall2), "=r" (syscall3), "=r" (syscall4), "=r" (newsp)
           : "r"(stack_pointer), "r"(_state)
           : "a0", "a1", "a2", "a3"
           : "volatile");
@@ -313,11 +318,16 @@ impl kernel::syscall::UserspaceKernelBoundary for SysCall {
             syscall0 as u8, syscall1 as usize, syscall2 as usize, syscall3 as usize, syscall4 as usize);
 
         let mut ret: kernel::syscall::ContextSwitchReason;
-        if (app_interrupt == 1){
+        if (switchReason == 1){
+            //debug_gpio!(1, set);
             ret = kernel::syscall::ContextSwitchReason::Interrupted;
-            app_interrupt = 0;
+            switchReason = 0;
         }
-        // else if(syscall.is_some()){
+        else if (switchReason == 2){
+            ret = kernel::syscall::ContextSwitchReason::Fault;
+            switchReason = 0;
+        }
+        // // else if(syscall.is_some()){
         //     ret = kernel::syscall::ContextSwitchReason::SyscallFired{syscall: syscall};
         // }
         // else{

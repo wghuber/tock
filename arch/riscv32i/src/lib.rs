@@ -4,7 +4,7 @@
 #![feature(crate_visibility_modifier)]
 #![no_std]
 
-#[macro_use(register_bitfields, register_bitmasks, debug_gpio, debug)]
+#[macro_use(register_bitfields, register_bitmasks, debug)]
 extern crate kernel;
 
 pub mod plic;
@@ -14,15 +14,9 @@ pub mod clic;
 pub mod machine_timer;
 
 extern "C" {
-    // External function defined by the board main.rs.
-    fn reset_handler();
-
     // Where the end of the stack region is (and hence where the stack should
     // start).
     static _estack: u32;
-
-    // // Address of _start_trap.
-    // static _start_trap: u32;
 
     // Boundaries of the .bss section.
     static mut _szero: u32;
@@ -34,7 +28,7 @@ extern "C" {
     // Boundaries of the .data section.
     static mut _srelocate: u32;
     static mut _erelocate: u32;
-  }
+}
 
 /// Entry point of all programs (`_start`).
 ///
@@ -128,9 +122,9 @@ pub unsafe fn configure_trap_handler() {
         // The csrw instruction writes a Control and Status Register (CSR)
         // with a new value.
         //
-        // CSR 0x305 (mtvec, 'Machine trap-handler base address.') sets the address
-        // of the trap handler. We do not care about its old value, so we don't
-        // bother reading it.
+        // CSR 0x305 (mtvec, 'Machine trap-handler base address.') sets the
+        // address of the trap handler. We do not care about its old value, so
+        // we don't bother reading it.
         csrw 0x305, $0        // Write the mtvec CSR.
     "
     :
@@ -170,21 +164,6 @@ pub extern "C" fn _start_trap() {
             csrrw sp, 0x340, sp // CSR=0x340=mscratch
             bnez  sp, _from_app // If sp != 0 then we must have come from an app.
 
-
-
-
-            // // First check which privilege level we came from. If we came from
-            // // user mode then we need to handle that differently from if we came
-            // // from kernel mode.
-            // //
-            // // The mstatus CSR contains information on the previous privilege
-            // // level once we have returned to machine mode.
-            // csrr t0, 0x300    // CSR=0x300=mstatus
-            // srli t1, t0, 28   // Shift the mstatus 11 bits to the right (MPP bits)
-            // andi t1, t1, 0x3  // `and` to get only the bottom two MPP bits
-            // beq  t1, x0, _from_app // If MPP=00 then we came from user mode
-
-            // // If mstatus.MPP=11 then we came from the kernel.
 
         _from_kernel:
             // Read back the stack pointer that we temporarily stored in

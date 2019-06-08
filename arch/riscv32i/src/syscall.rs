@@ -1,24 +1,8 @@
-//! Pseudo kernel-userland system call interface.
-//!
-//! This is for platforms that only include the "Machine Mode" privilege level.
-//! Since these chips don't have hardware support for user mode, we have to fake
-//! it. This means the apps have to be highly trusted as there is no real separation
-//! between the kernel and apps.
-//!
-//! Note: this really only exists so we can demonstrate Tock running on actual
-//! RISC-V hardware. Really, this is very undesirable for Tock as it violates
-//! the safety properties of the OS. As hardware starts to exist that supports M
-//! and U modes we will remove this.
+//! Kernel-userland system call interface for RISC-V architecture.
 
 use core::fmt::Write;
-use core::ptr::{read_volatile, write_volatile};
 
 use kernel;
-
-#[allow(improper_ctypes)]
-extern "C" {
-    pub fn switch_to_user(user_stack: *const u8, process_regs: &mut [usize; 8]) -> *mut u8;
-}
 
 /// This holds all of the state that the kernel must keep for the process when
 /// the process is not executing.
@@ -51,7 +35,14 @@ pub struct RiscvimacStoredState {
     /// 18    | s11
     /// ```
     regs: [usize; 19],
+
+    /// This holds the PC value of the app when the exception/syscall/interrupt
+    /// occurred. We also use this to set the PC that the app should start
+    /// executing at when it is resumed/started.
     pc: usize,
+
+    /// We need to store the mcause CSR between when the trap occurs and after
+    /// we exit the trap handler and resume the context switching code.
     mcause: usize,
 }
 
@@ -76,9 +67,6 @@ impl kernel::syscall::UserspaceKernelBoundary for SysCall {
         // Just need to put the return value in the a0 register for when the
         // process resumes executing.
         state.regs[2] = return_value as usize; // a0 = regs[2] = return value
-
-
-        debug!("r:{:#x} to:{:#x} ra:{:#x}", state.regs[2], state.pc, state.regs[0]);
     }
 
     unsafe fn set_process_function(
@@ -112,8 +100,6 @@ impl kernel::syscall::UserspaceKernelBoundary for SysCall {
         // Save the PC we expect to execute.
         state.pc = callback.pc;
 
-        debug!("going to {:#x}, ra: {:#x}, sp: {:#x}", callback.pc, state.regs[0], state.regs[1]);
-
         Ok(stack_pointer as *mut usize)
     }
 
@@ -122,9 +108,9 @@ impl kernel::syscall::UserspaceKernelBoundary for SysCall {
         _stack_pointer: *const usize,
         state: &mut RiscvimacStoredState,
         ) -> (*mut usize, kernel::syscall::ContextSwitchReason) {
-        let mut switch_reason: u32;
+        let switch_reason: u32;
         let mut syscall_args: [u32; 5] = [0; 5];
-        let mut new_stack_pointer: u32;
+        let new_stack_pointer: u32;
 
         asm! ("
           // Before switching to the app we need to save the kernel registers to
@@ -355,20 +341,10 @@ impl kernel::syscall::UserspaceKernelBoundary for SysCall {
         _done:
           nop
           "
-          : "=r"(switch_reason), "=r" (new_stack_pointer)
+          : "=r"(switch_reason), "=r"(new_stack_pointer)
           : "r"(state), "r"(&mut syscall_args)
           : "a0", "a1", "a2", "a3"
           : "volatile");
-
-
-        debug!("syscall: {:#x} {:#x} {:#x} {:#x} {:#x} {:#x} {:#x}",
-            syscall_args[0],
-            syscall_args[1],
-            syscall_args[2],
-            syscall_args[3],
-            syscall_args[4],
-            new_stack_pointer, switch_reason);
-
 
 
         // Prepare the return type that marks why the app stopped executing.
@@ -396,13 +372,13 @@ impl kernel::syscall::UserspaceKernelBoundary for SysCall {
         (new_stack_pointer as *mut usize, ret)
     }
 
-    unsafe fn fault_fmt(&self, writer: &mut Write) {}
+    unsafe fn fault_fmt(&self, _writer: &mut Write) {}
 
     unsafe fn process_detail_fmt(
         &self,
-        stack_pointer: *const usize,
-        state: &RiscvimacStoredState,
-        writer: &mut Write,
+        _stack_pointer: *const usize,
+        _state: &RiscvimacStoredState,
+        _writer: &mut Write,
         ) {
     }
 }

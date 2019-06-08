@@ -218,6 +218,10 @@ pub extern "C" fn _start_trap() {
             // board/chip can customize this as needed.
             jal ra, _start_trap_rust
 
+            // set mstatus how we expect
+            li   t0, 0x1808
+            csrw 0x300, t0
+
             // Restore the registers from the stack.
             lw   ra, 0*4(sp)
             lw   t0, 1*4(sp)
@@ -238,15 +242,6 @@ pub extern "C" fn _start_trap() {
 
             // Reset the stack pointer.
             addi sp, sp, 16*4
-
-
-//?????
-            // set mstatus how we expect
-            lui t4, %hi(0x00001800)
-            addi t4, t4, %lo(0x00001800)
-            csrw 0x300, t4
-//??????
-
 
             // mret returns from the trap handler. The PC is set to what is in
             // mepc and execution proceeds from there. Since we did not modify
@@ -282,6 +277,12 @@ pub extern "C" fn _start_trap() {
             // Ensure that mscratch is 0. This makes sure that we know that on
             // a future trap that we came from the kernel.
             csrw 0x340, zero  // CSR=0x340=mscratch
+
+            // Need to set mstatus.MPP to 0b11 so that we stay in machine mode.
+            csrr t0, 0x300    // CSR=0x300=mstatus
+            li   t1, 0x1808   // Load 0b11 to the MPP bits location in t1
+            or   t0, t0, t1   // Set the MPP bits to one
+            csrw 0x300, t0    // CSR=0x300=mstatus
 
             // Use mret to exit the trap handler and return to the context
             // switching code.

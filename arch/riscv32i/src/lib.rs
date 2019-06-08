@@ -62,6 +62,8 @@ pub extern "C" fn _start() {
             // Set s0 (the frame pointer) to the start of the stack.
             add  s0, sp, zero
 
+            // Initialize mscratch to 0 so that we know that we are currently
+            // in the kernel. This is used for the check in the trap handler.
             csrw 0x340, zero  // CSR=0x340=mscratch
 
             // With that initial setup out of the way, we now branch to the main

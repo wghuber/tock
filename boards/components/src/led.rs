@@ -21,6 +21,77 @@ use kernel::component::Component;
 use kernel::hil::gpio;
 use kernel::static_init;
 
+
+
+
+
+
+// Setup static space for the LED objects.
+#[macro_export]
+macro_rules! led_component_helper {
+    ($T:ty, $B:expr) => {
+        {
+            static mut BUF1: Option<capsules::led::LED<'static, $T>> = None;
+            static mut BUF2: Option<[(&'static $T, capsules::led::ActivationMode); $B]> = None;
+            (&mut BUF1, &mut BUF2)
+        };
+    }
+}
+
+// Same as static_init!() but without actually creating the static buffer.
+#[macro_export]
+macro_rules! static_init_h {
+    ($B:expr, $T:ty, $e:expr) => {
+        {
+            use core::{mem, ptr};
+            let tmp : &'static mut $T = mem::transmute($B);
+            ptr::write(tmp as *mut $T, $e);
+            tmp
+        };
+    }
+}
+
+
+
+pub struct LedComponent<T: 'static + gpio::Pin + gpio::PinCtl> {
+    led_pins: [(&'static T, led::ActivationMode); 1],
+}
+
+impl<T: 'static + gpio::Pin + gpio::PinCtl> LedComponent<T> {
+    pub fn new(led_pins: [(&'static T, led::ActivationMode); 1]) -> LedComponent<T> {
+        LedComponent {
+            led_pins,
+        }
+    }
+
+    pub unsafe fn finalize(&mut self,
+        BUF: (&mut Option<led::LED<'static, T>>,
+              &mut Option<[(&'static T, led::ActivationMode); 1]>)) -> &'static led::LED<'static, T> {
+        let pins = static_init_h!(
+            BUF.1,
+            [(&'static T, led::ActivationMode); 1],
+            self.led_pins
+        );
+
+        static_init_h!(
+            BUF.0,
+            led::LED<'static, T>,
+            led::LED::new(pins)
+        )
+    }
+}
+
+
+
+
+
+
+
+
+
+
+
+
 // pub struct LedComponent<'a, T: 'a + gpio::Pin> {
 //     led_pins: &'a T,
 // }
@@ -95,49 +166,7 @@ use kernel::static_init;
 //     }
 // }
 
-#[macro_export]
-macro_rules! led_component_helper {
-    ($T:ty) => {
 
-        {
-
-            static mut BUF: Option<capsules::led::LED<'static, $T>> = None;
-            &mut BUF
-        };
-    }
-}
-
-
-
-pub struct LedComponent<T: 'static + gpio::Pin + gpio::PinCtl> {
-    led_pins: &'static [(&'static T, led::ActivationMode)],
-}
-
-impl<T: 'static + gpio::Pin + gpio::PinCtl> LedComponent<T> {
-    pub fn new(led_pins: &'static [(&'static T, led::ActivationMode)]) -> LedComponent<T> {
-        LedComponent {
-            led_pins,
-        }
-    }
-
-    pub unsafe fn finalize(&mut self, BUF: &mut Option<led::LED<'static, T>>) -> &'static led::LED<'static, T> {
-        // static_init!(
-        //     led::LED<'static, T>,
-        //     led::LED::new(self.led_pins)
-        // )
-
-        use core::{mem, ptr};
-        // Statically allocate a read-write buffer for the value, write our
-        // initial value into it (without dropping the initial zeros) and
-        // return a reference to it.
-        // static mut BUF: Option<led::LED<'static, T>> = None;
-        let tmp : &'static mut led::LED<'static, T> = mem::transmute(BUF);
-        ptr::write(tmp as *mut led::LED<'static, T>, led::LED::new(self.led_pins));
-        tmp
-        //
-        // BUF
-    }
-}
 
 // pub struct LedComponent<T: 'static + gpio::Pin + gpio::PinCtl> {
 //     led_pins: &'static [(&'static T, led::ActivationMode)],

@@ -366,7 +366,10 @@ pub unsafe fn reset_handler() {
         [(&'static sam4l::gpio::GPIOPin, capsules::led::ActivationMode); 1],
         [(&sam4l::gpio::PC[10], capsules::led::ActivationMode::ActiveHigh),]
     );
-    let led = LedComponent::new(led_pins).finalize( );
+    // static mut BUF: Option<capsules::led::LED<'static, sam4l::gpio::GPIOPin>> = None;
+    // let led_helper = newcomp::led_component_helper!(capsules::led::LED<'static, sam4l::gpio::GPIOPin>);
+    let led_helper = newcomp::led_component_helper!(sam4l::gpio::GPIOPin);
+    let led = LedComponent::new(led_pins).finalize(led_helper);
 
     let button = ButtonComponent::new(board_kernel).finalize();
     let crc = CrcComponent::new(board_kernel).finalize();

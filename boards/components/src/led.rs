@@ -95,8 +95,17 @@ use kernel::static_init;
 //     }
 // }
 
+#[macro_export]
+macro_rules! led_component_helper {
+    ($T:ty) => {
 
+        {
 
+            static mut BUF: Option<capsules::led::LED<'static, $T>> = None;
+            &mut BUF
+        };
+    }
+}
 
 
 
@@ -111,7 +120,7 @@ impl<T: 'static + gpio::Pin + gpio::PinCtl> LedComponent<T> {
         }
     }
 
-    pub unsafe fn finalize(&mut self) -> &'static led::LED<'static, T> {
+    pub unsafe fn finalize(&mut self, BUF: &mut Option<led::LED<'static, T>>) -> &'static led::LED<'static, T> {
         // static_init!(
         //     led::LED<'static, T>,
         //     led::LED::new(self.led_pins)
@@ -121,8 +130,8 @@ impl<T: 'static + gpio::Pin + gpio::PinCtl> LedComponent<T> {
         // Statically allocate a read-write buffer for the value, write our
         // initial value into it (without dropping the initial zeros) and
         // return a reference to it.
-        let mut BUF: Option<led::LED<'static, T>> = None;
-        let tmp : &'static mut led::LED<'static, T> = mem::transmute(&mut BUF);
+        // static mut BUF: Option<led::LED<'static, T>> = None;
+        let tmp : &'static mut led::LED<'static, T> = mem::transmute(BUF);
         ptr::write(tmp as *mut led::LED<'static, T>, led::LED::new(self.led_pins));
         tmp
         //

@@ -8,6 +8,7 @@
 #![feature(in_band_lifetimes)]
 #![deny(missing_docs)]
 
+
 mod components;
 use capsules::alarm::AlarmDriver;
 use capsules::net::ieee802154::MacAddress;
@@ -36,7 +37,7 @@ use components::crc::CrcComponent;
 use components::fxos8700::NineDofComponent;
 use components::gpio::GpioComponent;
 use components::isl29035::AmbientLightComponent;
-use comp::led::LedComponent;
+use newcomp::led::LedComponent;
 use components::nonvolatile_storage::NonvolatileStorageComponent;
 use components::nrf51822::Nrf51822Component;
 use components::process_console::ProcessConsoleComponent;
@@ -360,7 +361,13 @@ pub unsafe fn reset_handler() {
 
     let adc = AdcComponent::new().finalize();
     let gpio = GpioComponent::new(board_kernel).finalize();
-    let led = LedComponent::new().finalize();
+
+    let led_pins = static_init!(
+        [(&'static sam4l::gpio::GPIOPin, capsules::led::ActivationMode); 1],
+        [(&sam4l::gpio::PC[10], capsules::led::ActivationMode::ActiveHigh),]
+    );
+    let led = LedComponent::new(led_pins).finalize( );
+
     let button = ButtonComponent::new(board_kernel).finalize();
     let crc = CrcComponent::new(board_kernel).finalize();
     let analog_comparator = AcComponent::new().finalize();

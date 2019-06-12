@@ -9,14 +9,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "components"
-version = "0.1.0"
-dependencies = [
- "capsules 0.1.0",
- "kernel 0.1.0",
-]
-
-[[package]]
 name = "cortexm"
 version = "0.1.0"
 dependencies = [
@@ -40,9 +32,9 @@ name = "imix"
 version = "0.1.0"
 dependencies = [
  "capsules 0.1.0",
- "components 0.1.0",
  "cortexm4 0.1.0",
  "kernel 0.1.0",
+ "newcomp 0.1.0",
  "sam4l 0.1.0",
 ]
 
@@ -52,6 +44,14 @@ version = "0.1.0"
 dependencies = [
  "tock-cells 0.1.0",
  "tock-registers 0.3.0",
+]
+
+[[package]]
+name = "newcomp"
+version = "0.1.0"
+dependencies = [
+ "capsules 0.1.0",
+ "kernel 0.1.0",
 ]
 
 [[package]]

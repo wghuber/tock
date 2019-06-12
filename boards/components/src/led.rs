@@ -19,6 +19,86 @@
 use capsules::led;
 use kernel::component::Component;
 use kernel::hil::gpio;
+use kernel::static_init;
+
+// pub struct LedComponent<'a, T: 'a + gpio::Pin> {
+//     led_pins: &'a T,
+// }
+
+// impl<'a, T:'a + gpio::Pin> LedComponent<'a, T> {
+//     pub fn new(led_pins: &'a T) -> LedComponent<'a, T> {
+//         LedComponent {
+//             led_pins,
+//         }
+//     }
+
+//     // unsafe fn finalize(&self) -> Option<&T> {
+//     //     let x: Option<&T> = None;
+//     //     // static_init!(
+//     //     //     led::LED<'static, T>,
+//     //     //     led::LED::new(self.led_pins)
+//     //     // )
+//     // }
+
+//     // unsafe fn finalize(&self) -> Option<led::LED<'static, T>> {
+//     unsafe fn finalize(&self) -> &'static led::LED<'static, T> {
+//         // // let x: Option<led::LED<'static, T>> = None;
+//         // static_init!(
+//         //     led::LED<'static, T>,
+//         //     led::LED::new(self.led_pins)
+//         // )
+//         // // x
+
+//         use core::{mem, ptr};
+//         // Statically allocate a read-write buffer for the value, write our
+//         // initial value into it (without dropping the initial zeros) and
+//         // return a reference to it.
+//         let BUF: Option<led::LED<'static, T>> = None;
+//         let tmp : &'static mut led::LED<'static, T> = mem::transmute(&mut BUF);
+//         ptr::write(tmp as *mut led::LED<'static, T>, led::LED::new(self.led_pins));
+//         tmp
+//         //
+//         // BUF
+//     }
+// }
+
+
+
+
+
+// pub struct LedComponent<'a, T: 'a + gpio::Pin> {
+//     led_pins: &'a T,
+// }
+
+// impl<'a, T:'a + gpio::Pin> LedComponent<'a, T> {
+//     pub fn new(led_pins: &'a T) -> LedComponent<'a, T> {
+//         LedComponent {
+//             led_pins,
+//         }
+//     }
+
+//     // unsafe fn finalize(&self) -> Option<&T> {
+//     //     let x: Option<&T> = None;
+//     //     // static_init!(
+//     //     //     led::LED<'static, T>,
+//     //     //     led::LED::new(self.led_pins)
+//     //     // )
+//     // }
+
+//     unsafe fn finalize(&self) -> Option<led::LED<'static, T>> {
+//         let x: Option<led::LED<'static, T>> = None;
+//         // static_init!(
+//         //     led::LED<'static, T>,
+//         //     led::LED::new(self.led_pins)
+//         // )
+//         x
+//     }
+// }
+
+
+
+
+
 
 pub struct LedComponent<T: 'static + gpio::Pin + gpio::PinCtl> {
     led_pins: &'static [(&'static T, led::ActivationMode)],
@@ -31,10 +111,9 @@ impl<T: 'static + gpio::Pin + gpio::PinCtl> LedComponent<T> {
         }
     }
 
-    // unsafe fn finalize<T: 'static + gpio::Pin + gpio::PinCtl>(&mut self) -> &'static led::LED<'static, T> {
-    unsafe fn finalize<T2: 'static + gpio::Pin + gpio::PinCtl>(&mut self) -> &'static mut led::LED<'static, T> {
+    pub unsafe fn finalize(&mut self) -> &'static led::LED<'static, T> {
         // static_init!(
-        //     led::LED<'static, T2>,
+        //     led::LED<'static, T>,
         //     led::LED::new(self.led_pins)
         // )
 
@@ -42,12 +121,58 @@ impl<T: 'static + gpio::Pin + gpio::PinCtl> LedComponent<T> {
         // Statically allocate a read-write buffer for the value, write our
         // initial value into it (without dropping the initial zeros) and
         // return a reference to it.
-        static mut BUF: Option<led::LED<'static, T2>> = None;
-        let tmp : &'static mut led::LED<'static, T2> = mem::transmute(&mut BUF);
-        ptr::write(tmp as *mut led::LED<'static, T2>, led::LED::new(self.led_pins));
+        let mut BUF: Option<led::LED<'static, T>> = None;
+        let tmp : &'static mut led::LED<'static, T> = mem::transmute(&mut BUF);
+        ptr::write(tmp as *mut led::LED<'static, T>, led::LED::new(self.led_pins));
         tmp
+        //
+        // BUF
     }
 }
+
+// pub struct LedComponent<T: 'static + gpio::Pin + gpio::PinCtl> {
+//     led_pins: &'static [(&'static T, led::ActivationMode)],
+// }
+
+// impl<T: 'static + gpio::Pin + gpio::PinCtl> LedComponent<T> {
+//     pub fn new(led_pins: &'static [(&'static T, led::ActivationMode)]) -> LedComponent<T> {
+//         LedComponent {
+//             led_pins,
+//         }
+//     }
+
+//     unsafe fn finalize(&mut self) -> &'static led::LED<'static, T> {
+//         static_init!(
+//             led::LED<'static, T>,
+//             led::LED::new(self.led_pins)
+//         )
+//     }
+// }
+
+// impl<T: 'static + gpio::Pin + gpio::PinCtl> LedComponent<T> {
+//     pub fn new(led_pins: &'static [(&'static T, led::ActivationMode)]) -> LedComponent<T> {
+//         LedComponent {
+//             led_pins,
+//         }
+//     }
+
+//     // unsafe fn finalize<T: 'static + gpio::Pin + gpio::PinCtl>(&mut self) -> &'static led::LED<'static, T> {
+//     unsafe fn finalize<T2: 'static + gpio::Pin + gpio::PinCtl>(&mut self) -> &'static mut led::LED<'static, T> {
+//         // static_init!(
+//         //     led::LED<'static, T2>,
+//         //     led::LED::new(self.led_pins)
+//         // )
+
+//         use core::{mem, ptr};
+//         // Statically allocate a read-write buffer for the value, write our
+//         // initial value into it (without dropping the initial zeros) and
+//         // return a reference to it.
+//         static mut BUF: Option<led::LED<'static, T2>> = None;
+//         let tmp : &'static mut led::LED<'static, T2> = mem::transmute(&mut BUF);
+//         ptr::write(tmp as *mut led::LED<'static, T2>, led::LED::new(self.led_pins));
+//         tmp
+//     }
+// }
 
 // impl<T: 'static + gpio::Pin + gpio::PinCtl> Component for LedComponent<T> {
 //     type Output = &'static led::LED<'static, T>;

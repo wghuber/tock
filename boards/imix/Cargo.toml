@@ -18,7 +18,7 @@ opt-level = "z"
 debug = true
 
 [dependencies]
-components = { path = "../components" }
+newcomp = { path = "../components" }
 cortexm4 = { path = "../../arch/cortex-m4" }
 capsules = { path = "../../capsules" }
 kernel = { path = "../../kernel" }

@@ -13,6 +13,9 @@
 #![warn(unreachable_pub)]
 #![no_std]
 
+#![doc(html_favicon_url = "https://www.tockos.org/assets/img/favicon.ico")]
+#![doc(html_logo_url = "https://www.tockos.org/assets/img/logo_square_big.png")]
+
 pub mod capabilities;
 #[macro_use]
 pub mod common;

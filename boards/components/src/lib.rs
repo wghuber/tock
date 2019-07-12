@@ -8,5 +8,6 @@ pub mod isl29035;
 pub mod rng;
 #[macro_use]
 pub mod crc;
-#[macro_use]
-pub mod fxos8700;
+pub mod process_console;
+pub mod console;
+pub mod nrf51822;

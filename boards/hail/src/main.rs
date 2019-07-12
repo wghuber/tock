@@ -18,7 +18,7 @@ use kernel::hil::Controller;
 use kernel::Platform;
 #[allow(unused_imports)]
 use kernel::{create_capability, debug, debug_gpio, static_init};
-use kernel::component::Component2;
+use kernel::component::{Component, Component2};
 
 /// Support routines for debugging I/O.
 ///
@@ -225,55 +225,16 @@ pub unsafe fn reset_handler() {
     hil::uart::Transmit::set_transmit_client(&sam4l::usart::USART0, uart_mux);
     hil::uart::Receive::set_receive_client(&sam4l::usart::USART0, uart_mux);
 
-    // Create a UartDevice for the console.
-    let console_uart = static_init!(UartDevice, UartDevice::new(uart_mux, true));
-    console_uart.setup();
-    let console = static_init!(
-        capsules::console::Console<'static>,
-        capsules::console::Console::new(
-            console_uart,
-            &mut capsules::console::WRITE_BUF,
-            &mut capsules::console::READ_BUF,
-            board_kernel.create_grant(&memory_allocation_capability)
-        )
-    );
-    hil::uart::Transmit::set_transmit_client(console_uart, console);
-    hil::uart::Receive::set_receive_client(console_uart, console);
+    // Setup the console and the process inspection console.
+    let console = newcomp::console::ConsoleComponent::new(board_kernel, uart_mux).finalize();
+    let process_console = newcomp::process_console::ProcessConsoleComponent::new(board_kernel, uart_mux).finalize();
 
-    // Setup the process inspection console
-    let process_console_uart = static_init!(UartDevice, UartDevice::new(uart_mux, true));
-    process_console_uart.setup();
-    pub struct ProcessConsoleCapability;
-    unsafe impl capabilities::ProcessManagementCapability for ProcessConsoleCapability {}
-    let process_console = static_init!(
-        capsules::process_console::ProcessConsole<'static, ProcessConsoleCapability>,
-        capsules::process_console::ProcessConsole::new(
-            process_console_uart,
-            &mut capsules::process_console::WRITE_BUF,
-            &mut capsules::process_console::READ_BUF,
-            &mut capsules::process_console::COMMAND_BUF,
-            board_kernel,
-            ProcessConsoleCapability,
-        )
-    );
-    hil::uart::Transmit::set_transmit_client(process_console_uart, process_console);
-    hil::uart::Receive::set_receive_client(process_console_uart, process_console);
-
-    // Initialize USART3 for Uart
+    // Initialize USART3 for UART for the nRF serialization link.
     sam4l::usart::USART3.set_mode(sam4l::usart::UsartMode::Uart);
     // Create the Nrf51822Serialization driver for passing BLE commands
     // over UART to the nRF51822 radio.
-    let nrf_serialization = static_init!(
-        capsules::nrf51822_serialization::Nrf51822Serialization<'static>,
-        capsules::nrf51822_serialization::Nrf51822Serialization::new(
-            &sam4l::usart::USART3,
-            &sam4l::gpio::PA[17],
-            &mut capsules::nrf51822_serialization::WRITE_BUF,
-            &mut capsules::nrf51822_serialization::READ_BUF
-        )
-    );
-    hil::uart::Transmit::set_transmit_client(&sam4l::usart::USART3, nrf_serialization);
-    hil::uart::Receive::set_receive_client(&sam4l::usart::USART3, nrf_serialization);
+    let nrf_serialization =
+        newcomp::nrf51822::Nrf51822Component::new(&sam4l::usart::USART3, &sam4l::gpio::PA[17]).finalize();
 
     let ast = &sam4l::ast::AST;
 

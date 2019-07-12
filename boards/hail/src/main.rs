@@ -289,18 +289,20 @@ pub unsafe fn reset_handler() {
     let ambient_light = newcomp::isl29035::AmbientLightComponent::new(board_kernel, sensors_i2c, mux_alarm).finalize(newcomp::isl29035_component_helper!(sam4l::ast::Ast));
 
     // Alarm
-    let virtual_alarm1 = static_init!(
-        VirtualMuxAlarm<'static, sam4l::ast::Ast>,
-        VirtualMuxAlarm::new(mux_alarm)
-    );
-    let alarm = static_init!(
-        capsules::alarm::AlarmDriver<'static, VirtualMuxAlarm<'static, sam4l::ast::Ast>>,
-        capsules::alarm::AlarmDriver::new(
-            virtual_alarm1,
-            board_kernel.create_grant(&memory_allocation_capability)
-        )
-    );
-    virtual_alarm1.set_client(alarm);
+    // let virtual_alarm1 = static_init!(
+    //     VirtualMuxAlarm<'static, sam4l::ast::Ast>,
+    //     VirtualMuxAlarm::new(mux_alarm)
+    // );
+    // let alarm = static_init!(
+    //     capsules::alarm::AlarmDriver<'static, VirtualMuxAlarm<'static, sam4l::ast::Ast>>,
+    //     capsules::alarm::AlarmDriver::new(
+    //         virtual_alarm1,
+    //         board_kernel.create_grant(&memory_allocation_capability)
+    //     )
+    // );
+    // virtual_alarm1.set_client(alarm);
+
+    let alarm = newcomp::alarm::AlarmDriverComponent::new(board_kernel, mux_alarm).finalize(newcomp::alarm_component_helper!(sam4l::ast::Ast));
 
     // FXOS8700CQ accelerometer, device address 0x1e
     let fxos8700_i2c = static_init!(I2CDevice, I2CDevice::new(sensors_i2c, 0x1e));

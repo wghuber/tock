@@ -13,13 +13,12 @@ use capsules::virtual_spi::{MuxSpiMaster, VirtualSpiMasterDevice};
 use capsules::virtual_uart::{MuxUart, UartDevice};
 use kernel::capabilities;
 use kernel::hil;
-use kernel::hil::entropy::Entropy32;
-use kernel::hil::rng::Rng;
 use kernel::hil::spi::SpiMaster;
 use kernel::hil::Controller;
 use kernel::Platform;
 #[allow(unused_imports)]
 use kernel::{create_capability, debug, debug_gpio, static_init};
+use kernel::component::Component2;
 
 /// Support routines for debugging I/O.
 ///
@@ -326,30 +325,7 @@ pub unsafe fn reset_handler() {
     kernel::hil::sensors::HumidityDriver::set_client(si7021, humidity);
 
     // Configure the ISL29035, device address 0x44
-    let isl29035_i2c = static_init!(I2CDevice, I2CDevice::new(sensors_i2c, 0x44));
-    let isl29035_virtual_alarm = static_init!(
-        VirtualMuxAlarm<'static, sam4l::ast::Ast>,
-        VirtualMuxAlarm::new(mux_alarm)
-    );
-    let isl29035 = static_init!(
-        capsules::isl29035::Isl29035<'static, VirtualMuxAlarm<'static, sam4l::ast::Ast>>,
-        capsules::isl29035::Isl29035::new(
-            isl29035_i2c,
-            isl29035_virtual_alarm,
-            &mut capsules::isl29035::BUF
-        )
-    );
-    isl29035_i2c.set_client(isl29035);
-    isl29035_virtual_alarm.set_client(isl29035);
-
-    let ambient_light = static_init!(
-        capsules::ambient_light::AmbientLight<'static>,
-        capsules::ambient_light::AmbientLight::new(
-            isl29035,
-            board_kernel.create_grant(&memory_allocation_capability)
-        )
-    );
-    hil::sensors::AmbientLight::set_client(isl29035, ambient_light);
+    let ambient_light = newcomp::isl29035::AmbientLightComponent::new(board_kernel, sensors_i2c, mux_alarm).finalize(newcomp::isl29035_component_helper!(sam4l::ast::Ast));
 
     // Alarm
     let virtual_alarm1 = static_init!(
@@ -480,19 +456,7 @@ pub unsafe fn reset_handler() {
     sam4l::adc::ADC0.set_client(adc);
 
     // Setup RNG
-    let entropy_to_random = static_init!(
-        capsules::rng::Entropy32ToRandom<'static>,
-        capsules::rng::Entropy32ToRandom::new(&sam4l::trng::TRNG)
-    );
-    let rng = static_init!(
-        capsules::rng::RngDriver<'static>,
-        capsules::rng::RngDriver::new(
-            entropy_to_random,
-            board_kernel.create_grant(&memory_allocation_capability)
-        )
-    );
-    sam4l::trng::TRNG.set_client(entropy_to_random);
-    entropy_to_random.set_client(rng);
+    let rng = newcomp::rng::RngComponent::new(board_kernel, &sam4l::trng::TRNG).finalize(());
 
     // set GPIO driver controlling remaining GPIO pins
     let gpio_pins = static_init!(
@@ -516,14 +480,7 @@ pub unsafe fn reset_handler() {
     }
 
     // CRC
-    let crc = static_init!(
-        capsules::crc::Crc<'static, sam4l::crccu::Crccu<'static>>,
-        capsules::crc::Crc::new(
-            &mut sam4l::crccu::CRCCU,
-            board_kernel.create_grant(&memory_allocation_capability)
-        )
-    );
-    sam4l::crccu::CRCCU.set_client(crc);
+    let crc = newcomp::crc::CrcComponent::new(board_kernel, &sam4l::crccu::CRCCU).finalize(newcomp::crc_component_helper!(sam4l::crccu::Crccu));
 
     // DAC
     let dac = static_init!(

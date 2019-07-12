@@ -10,8 +10,7 @@ use capsules::virtual_spi::MuxSpiMaster;
 use capsules::virtual_uart::{MuxUart, UartDevice};
 use kernel::capabilities;
 use kernel::hil;
-use kernel::hil::entropy::Entropy32;
-use kernel::hil::rng::Rng;
+use kernel::component::Component2;
 use nrf5x::rtc::Rtc;
 
 use kernel::common::dynamic_deferred_call::{DynamicDeferredCall, DynamicDeferredCallClientState};
@@ -295,20 +294,7 @@ pub unsafe fn setup_board(
     );
     kernel::hil::sensors::TemperatureDriver::set_client(&nrf5x::temperature::TEMP, temp);
 
-    let entropy_to_random = static_init!(
-        capsules::rng::Entropy32ToRandom<'static>,
-        capsules::rng::Entropy32ToRandom::new(&nrf5x::trng::TRNG)
-    );
-
-    let rng = static_init!(
-        capsules::rng::RngDriver<'static>,
-        capsules::rng::RngDriver::new(
-            entropy_to_random,
-            board_kernel.create_grant(&memory_allocation_capability)
-        )
-    );
-    nrf5x::trng::TRNG.set_client(entropy_to_random);
-    entropy_to_random.set_client(rng);
+    let rng = newcomp::rng::RngComponent::new(board_kernel, &nrf5x::trng::TRNG).finalize(());
 
     // SPI
     let mux_spi = static_init!(

@@ -36,7 +36,7 @@ use components::console::ConsoleComponent;
 use components::crc::CrcComponent;
 use components::fxos8700::NineDofComponent;
 use components::gpio::GpioComponent;
-use components::isl29035::AmbientLightComponent;
+use newcomp::isl29035::AmbientLightComponent;
 use newcomp::led::LedComponent;
 use components::nonvolatile_storage::NonvolatileStorageComponent;
 use components::nrf51822::Nrf51822Component;
@@ -333,7 +333,11 @@ pub unsafe fn reset_handler() {
     let mux_i2c = static_init!(MuxI2C<'static>, MuxI2C::new(&sam4l::i2c::I2C2));
     sam4l::i2c::I2C2.set_master_client(mux_i2c);
 
-    let ambient_light = AmbientLightComponent::new(board_kernel, mux_i2c, mux_alarm).finalize();
+    // let ambient_light = AmbientLightComponent::new(board_kernel, mux_i2c, mux_alarm).finalize();
+
+    // let ambient_light_helper = newcomp::isl29035_component_helper!(sam4l::ast::Ast);
+    let ambient_light = AmbientLightComponent::new(board_kernel, mux_i2c, mux_alarm).finalize(newcomp::isl29035_component_helper!(sam4l::ast::Ast));
+
     let si7021 = SI7021Component::new(mux_i2c, mux_alarm).finalize();
     let temp = TemperatureComponent::new(board_kernel, si7021).finalize();
     let humidity = HumidityComponent::new(board_kernel, si7021).finalize();

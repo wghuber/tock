@@ -27,3 +27,19 @@ pub trait Component {
     /// kernel.
     unsafe fn finalize(&mut self) -> Self::Output;
 }
+
+pub trait Component2 {
+    /// The type (e.g., capsule, peripheral) that this implementation
+    /// of Component produces via finalize. This is typically a
+    /// static reference (`&'static`).
+    type Output;
+
+    type InputBuffer;
+
+    /// A factory method that returns an instance of the Output type
+    /// of this Component implementation.  This factory method may
+    /// only be called once per Component instance.  Used in the boot
+    /// sequence to instantiate and initalize part of the Tock
+    /// kernel.
+    unsafe fn finalize(&mut self, buf: Self::InputBuffer) -> Self::Output;
+}

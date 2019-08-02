@@ -50,6 +50,7 @@ use crate::common::cells::{MapCell, TakeCell};
 use crate::hil;
 use crate::process::ProcessType;
 use crate::ReturnCode;
+use crate::console;
 
 ///////////////////////////////////////////////////////////////////
 // panic! support routines
@@ -206,7 +207,7 @@ pub struct DebugWriterWrapper {
 /// the UART provider and this debug module.
 pub struct DebugWriter {
     // What provides the actual writing mechanism.
-    uart: &'static hil::uart::Transmit<'static>,
+    console_mux: &'static console::Console<'static>,
     // The buffer that is passed to the writing mechanism.
     output_buffer: TakeCell<'static, [u8]>,
     // An internal buffer that is used to hold debug!() calls as they come in.
@@ -248,12 +249,12 @@ impl DebugWriterWrapper {
 
 impl DebugWriter {
     pub fn new(
-        uart: &'static hil::uart::Transmit,
+        console_mux: &'static console::Console,
         out_buffer: &'static mut [u8],
         internal_buffer: &'static mut [u8],
     ) -> DebugWriter {
         DebugWriter {
-            uart: uart,
+            console_mux: console_mux,
             output_buffer: TakeCell::new(out_buffer),
             internal_buffer: TakeCell::new(internal_buffer),
             head: Cell::new(0),       // first valid index in output_buffer
@@ -329,7 +330,7 @@ impl DebugWriter {
 
             // Transmit the data in the output buffer.
             let out_len = real_end - start;
-            let (rval, opt) = self.uart.transmit_buffer(out_buffer, out_len);
+            let (rval, opt) = self.console_mux.transmit_message(out_buffer, out_len, None);
             match rval {
                 ReturnCode::SUCCESS => {
                     // Set the outgoing length
@@ -349,8 +350,8 @@ impl DebugWriter {
     }
 }
 
-impl hil::uart::TransmitClient for DebugWriter {
-    fn transmitted_buffer(&self, buffer: &'static mut [u8], tx_len: usize, _rcode: ReturnCode) {
+impl console::ConsoleClient for DebugWriter {
+    fn transmitted_message(&self, buffer: &'static mut [u8], tx_len: usize, _rcode: ReturnCode) {
         // Replace this buffer since we are done with it.
         self.output_buffer.replace(buffer);
 
@@ -386,7 +387,12 @@ impl hil::uart::TransmitClient for DebugWriter {
             self.publish_str();
         }
     }
-    fn transmitted_word(&self, _rcode: ReturnCode) {}
+    fn received_message(
+        &self,
+        _buffer: &'static mut [u8],
+        _rx_len: usize,
+        _rcode: ReturnCode,
+    ){}
 }
 
 /// Pass through functions.

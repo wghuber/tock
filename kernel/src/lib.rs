@@ -17,6 +17,7 @@ pub mod capabilities;
 #[macro_use]
 pub mod common;
 pub mod component;
+pub mod console;
 #[macro_use]
 pub mod debug;
 pub mod hil;

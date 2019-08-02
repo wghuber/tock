@@ -269,8 +269,6 @@ pub unsafe fn reset_handler() {
     );
 
     // Setup the process inspection console
-    // let process_console_uart = static_init!(UartDevice, UartDevice::new(uart_mux, true));
-    // process_console_uart.setup();
     let process_console_mux_client = static_init!(
         capsules::console_mux::ConsoleMuxClient,
         capsules::console_mux::ConsoleMuxClient::new(console_mux, "Process Console")
@@ -289,6 +287,26 @@ pub unsafe fn reset_handler() {
         )
     );
     process_console_mux_client.setup(process_console);
+
+    // Create virtual device for kernel debug.
+    let kernel_debug_mux_client = static_init!(
+        capsules::console_mux::ConsoleMuxClient,
+        capsules::console_mux::ConsoleMuxClient::new(console_mux, "debug")
+    );
+    let debugger = static_init!(
+        kernel::debug::DebugWriter,
+        kernel::debug::DebugWriter::new(
+            kernel_debug_mux_client,
+            &mut kernel::debug::OUTPUT_BUF,
+            &mut kernel::debug::INTERNAL_BUF,
+        )
+    );
+    kernel_debug_mux_client.setup_as_kernel_debug(debugger);
+
+
+
+
+
 
     // Initialize USART3 for Uart
     sam4l::usart::USART3.set_mode(sam4l::usart::UsartMode::Uart);
@@ -602,19 +620,7 @@ pub unsafe fn reset_handler() {
         dac: dac,
     };
 
-    // Create virtual device for kernel debug.
-    let debugger_uart = static_init!(UartDevice, UartDevice::new(uart_mux, false));
-    debugger_uart.setup();
-    let debugger = static_init!(
-        kernel::debug::DebugWriter,
-        kernel::debug::DebugWriter::new(
-            debugger_uart,
-            &mut kernel::debug::OUTPUT_BUF,
-            &mut kernel::debug::INTERNAL_BUF,
-        )
-    );
-    hil::uart::Transmit::set_transmit_client(debugger_uart, debugger);
-
+    // Finish setting up the kernel debugging tool.
     let debug_wrapper = static_init!(
         kernel::debug::DebugWriterWrapper,
         kernel::debug::DebugWriterWrapper::new(debugger)

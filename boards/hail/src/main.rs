@@ -303,11 +303,6 @@ pub unsafe fn reset_handler() {
     );
     kernel_debug_mux_client.setup_as_kernel_debug(debugger);
 
-
-
-
-
-
     // Initialize USART3 for Uart
     sam4l::usart::USART3.set_mode(sam4l::usart::UsartMode::Uart);
     // Create the Nrf51822Serialization driver for passing BLE commands

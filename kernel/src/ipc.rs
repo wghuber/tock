@@ -119,7 +119,7 @@ impl Driver for IPC {
             // Once subscribed, the client will receive callbacks when the
             // service process calls notify_client().
             svc_id => {
-                if svc_id - 1 >= 8 {
+                if svc_id > 8 {
                     ReturnCode::EINVAL /* Maximum of 8 IPC's exceeded */
                 } else {
                     self.data
@@ -157,9 +157,10 @@ impl Driver for IPC {
             .kernel
             .process_map_or(ReturnCode::EINVAL, target_id - 1, |target| {
                 let ret = target.enqueue_task(process::Task::IPC((appid, cb_type)));
-                match ret {
-                    true => ReturnCode::SUCCESS,
-                    false => ReturnCode::FAIL,
+                if ret {
+                    ReturnCode::SUCCESS
+                } else {
+                    ReturnCode::FAIL
                 }
             })
     }
@@ -205,8 +206,7 @@ impl Driver for IPC {
 
             return ReturnCode::EINVAL; /* AppSlice must have non-zero length */
         }
-        return self
-            .data
+        self.data
             .enter(appid, |data, _| {
                 data.shared_memory
                     .get_mut(target_id - 1)
@@ -216,6 +216,6 @@ impl Driver for IPC {
                     })
                     .unwrap_or(ReturnCode::EINVAL) /* Target process does not exist */
             })
-            .unwrap_or(ReturnCode::EBUSY);
+            .unwrap_or(ReturnCode::EBUSY)
     }
 }

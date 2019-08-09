@@ -491,7 +491,7 @@ impl<C: Chip> ProcessType for Process<'a, C> {
 
         // Make a note that we lost this callback if the enqueue function
         // fails.
-        if ret == false {
+        if !ret {
             self.debug.map(|debug| {
                 debug.dropped_callback_count += 1;
             });
@@ -707,9 +707,7 @@ impl<C: Chip> ProcessType for Process<'a, C> {
                 &mut config,
             );
 
-            if new_region.is_none() {
-                return None;
-            }
+            new_region?;
 
             for region in self.mpu_regions.iter() {
                 if region.get().is_none() {
@@ -745,7 +743,7 @@ impl<C: Chip> ProcessType for Process<'a, C> {
                 } else {
                     let old_break = self.app_break.get();
                     self.app_break.set(new_break);
-                    self.chip.mpu().configure_mpu(&mut config);
+                    self.chip.mpu().configure_mpu(config);
                     Ok(old_break)
                 }
             })
@@ -756,7 +754,7 @@ impl<C: Chip> ProcessType for Process<'a, C> {
         buf_start_addr: *const u8,
         size: usize,
     ) -> Result<Option<AppSlice<Shared, u8>>, ReturnCode> {
-        if buf_start_addr == ptr::null_mut() {
+        if buf_start_addr.is_null() {
             // A null buffer means pass in `None` to the capsule
             Ok(None)
         } else if self.in_app_owned_memory(buf_start_addr, size) {
@@ -1090,13 +1088,17 @@ impl<C: 'static + Chip> Process<'a, C> {
             let mut mpu_config: <<C as Chip>::MPU as MPU>::MpuConfig = Default::default();
 
             // Allocate MPU region for flash.
-            if let None = chip.mpu().allocate_region(
-                app_flash_address,
-                app_flash_size,
-                app_flash_size,
-                mpu::Permissions::ReadExecuteOnly,
-                &mut mpu_config,
-            ) {
+            if chip
+                .mpu()
+                .allocate_region(
+                    app_flash_address,
+                    app_flash_size,
+                    app_flash_size,
+                    mpu::Permissions::ReadExecuteOnly,
+                    &mut mpu_config,
+                )
+                .is_none()
+            {
                 return (None, app_flash_size, 0);
             }
 

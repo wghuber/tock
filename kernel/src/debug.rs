@@ -372,7 +372,7 @@ impl hil::uart::TransmitClient for DebugWriter {
         // mechanism, and wrap if needed.
         tail += tx_len;
         if tail > len {
-            tail = tail - len;
+            tail -= len;
         }
 
         if head == tail {
@@ -467,7 +467,7 @@ impl Write for DebugWriterWrapper {
             //  o head = len-1, tail = 0 (buffer full edge case)
             //  o there are no more bytes to write
 
-            if remaining_bytes.len() != 0 {
+            if !remaining_bytes.is_empty() {
                 // Now write from the head up to tail
                 let start = head;
                 let end = tail;

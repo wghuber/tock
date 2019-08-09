@@ -119,8 +119,8 @@ pub enum RadioChannel {
 }
 
 impl RadioChannel {
-    pub fn get_channel_index(&self) -> u32 {
-        match *self {
+    pub fn get_channel_index(self) -> u32 {
+        match self {
             RadioChannel::DataChannel0 => 0,
             RadioChannel::DataChannel1 => 1,
             RadioChannel::DataChannel2 => 2,

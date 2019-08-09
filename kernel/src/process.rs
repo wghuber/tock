@@ -40,7 +40,7 @@ pub fn load_processes<C: Chip>(
     let mut apps_in_flash_ptr = start_of_flash;
     let mut app_memory_ptr = app_memory.as_mut_ptr();
     let mut app_memory_size = app_memory.len();
-    for i in 0..procs.len() {
+    for (i, proc) in procs.iter_mut().enumerate() {
         unsafe {
             let (process, flash_offset, memory_offset) = Process::create(
                 kernel,
@@ -61,7 +61,7 @@ pub fn load_processes<C: Chip>(
                     break;
                 }
             } else {
-                procs[i] = process;
+                *proc = process;
             }
 
             apps_in_flash_ptr = apps_in_flash_ptr.add(flash_offset);

@@ -184,26 +184,23 @@ impl Driver for IPC {
         slice: Option<AppSlice<Shared, u8>>,
     ) -> ReturnCode {
         if target_id == 0 {
-            match slice {
-                Some(slice_data) => {
-                    let ret = self.data.kernel.process_until(|p| {
-                        let s = p.get_process_name().as_bytes();
-                        // are slices equal?
-                        if s.len() == slice_data.len()
-                            && s.iter().zip(slice_data.iter()).all(|(c1, c2)| c1 == c2)
-                        {
-                            ReturnCode::SuccessWithValue {
-                                value: (p.appid().idx() as usize) + 1,
-                            }
-                        } else {
-                            ReturnCode::FAIL
+            if let Some(slice_data) = slice {
+                let ret = self.data.kernel.process_until(|p| {
+                    let s = p.get_process_name().as_bytes();
+                    // are slices equal?
+                    if s.len() == slice_data.len()
+                        && s.iter().zip(slice_data.iter()).all(|(c1, c2)| c1 == c2)
+                    {
+                        ReturnCode::SuccessWithValue {
+                            value: (p.appid().idx() as usize) + 1,
                         }
-                    });
-                    if ret != ReturnCode::FAIL {
-                        return ret;
+                    } else {
+                        ReturnCode::FAIL
                     }
+                });
+                if ret != ReturnCode::FAIL {
+                    return ret;
                 }
-                None => {}
             }
 
             return ReturnCode::EINVAL; /* AppSlice must have non-zero length */

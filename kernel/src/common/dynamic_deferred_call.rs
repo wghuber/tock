@@ -134,7 +134,9 @@ impl DynamicDeferredCall {
     ///
     /// Returns `true` if a global instance was registered and has been called.
     pub unsafe fn call_global_instance() -> bool {
-        DYNAMIC_DEFERRED_CALL.map(|ddc| ddc.call()).is_some()
+        DYNAMIC_DEFERRED_CALL
+            .map(DynamicDeferredCall::call)
+            .is_some()
     }
 
     /// Call the globally registered instance while the supplied predicate
@@ -153,7 +155,7 @@ impl DynamicDeferredCall {
     /// Returns `None` if no global instance has been registered, or `Some(true)`
     /// if the registered instance has one or more pending deferred calls.
     pub unsafe fn global_instance_calls_pending() -> Option<bool> {
-        DYNAMIC_DEFERRED_CALL.map(|ddc| ddc.has_pending())
+        DYNAMIC_DEFERRED_CALL.map(DynamicDeferredCall::has_pending)
     }
 
     /// Schedule a deferred call to be called

@@ -140,14 +140,11 @@ impl<'a, T: ?Sized> TakeCell<'a, T> {
         F: FnOnce(&mut T) -> U,
     {
         let maybe_val = self.take();
-        maybe_val.map_or_else(
-            || default(),
-            |mut val| {
-                let res = f(&mut val);
-                self.replace(val);
-                res
-            },
-        )
+        maybe_val.map_or(default(), |mut val| {
+            let res = f(&mut val);
+            self.replace(val);
+            res
+        })
     }
 
     /// Behaves the same as `map`, except the closure is allowed to return

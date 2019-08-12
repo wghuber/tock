@@ -27,6 +27,10 @@ impl<T: Copy> queue::Queue<T> for RingBuffer<'a, T> {
         self.head == ((self.tail + 1) % self.ring.len())
     }
 
+    fn is_empty(&self) -> bool {
+        self.head == self.tail
+    }
+
     fn len(&self) -> usize {
         if self.tail > self.head {
             self.tail - self.head

@@ -7,6 +7,9 @@ pub trait Queue<T> {
     /// Returns true if the queue is full, false otherwise.
     fn is_full(&self) -> bool;
 
+    /// Returns true if the queue is empty, false otherwise.
+    fn is_empty(&self) -> bool;
+
     /// Returns how many elements are in the queue.
     fn len(&self) -> usize;
 

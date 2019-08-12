@@ -127,7 +127,7 @@ impl TbfHeader {
     crate fn get_protected_size(&self) -> u32 {
         match *self {
             TbfHeader::TbfHeaderV2(hd) => {
-                hd.main.map_or(0, |m| m.protected_size) + (hd.base.header_size as u32)
+                hd.main.map_or(0, |m| m.protected_size) + (u32::from(hd.base.header_size))
             }
             _ => 0,
         }
@@ -138,7 +138,7 @@ impl TbfHeader {
     crate fn get_init_function_offset(&self) -> u32 {
         match *self {
             TbfHeader::TbfHeaderV2(hd) => {
-                hd.main.map_or(0, |m| m.init_fn_offset) + (hd.base.header_size as u32)
+                hd.main.map_or(0, |m| m.init_fn_offset) + (u32::from(hd.base.header_size))
             }
             _ => 0,
         }
@@ -193,7 +193,7 @@ crate unsafe fn parse_and_validate_tbf_header(address: *const u8) -> Option<TbfH
             // Some sanity checking. Make sure the header isn't longer than the
             // total app. Make sure the total app fits inside a reasonable size
             // of flash.
-            if tbf_header_base.header_size as u32 >= tbf_header_base.total_size
+            if u32::from(tbf_header_base.header_size) >= tbf_header_base.total_size
                 || tbf_header_base.total_size > 0x010000000
             {
                 return None;

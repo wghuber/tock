@@ -516,7 +516,7 @@ impl spi::SpiMaster for SpiHw {
     /// By default, initialize SPI to operate at 40KHz, clock is
     /// idle on low, and sample on the leading edge.
     fn init(&self) {
-        let spi = &SpiRegisterManager::new(&self);
+        let spi = &SpiRegisterManager::new(self);
         self.init_as_role(spi, SpiRole::SpiMaster);
     }
 
@@ -527,7 +527,7 @@ impl spi::SpiMaster for SpiHw {
     /// Write a byte to the SPI and discard the read; if an
     /// asynchronous operation is outstanding, do nothing.
     fn write_byte(&self, out_byte: u8) {
-        let spi = &SpiRegisterManager::new(&self);
+        let spi = &SpiRegisterManager::new(self);
 
         let tdr = (out_byte as u32) & spi_consts::tdr::TD;
         // Wait for data to leave TDR and enter serializer, so TDR is free
@@ -545,7 +545,7 @@ impl spi::SpiMaster for SpiHw {
     /// Write a byte to the SPI and return the read; if an
     /// asynchronous operation is outstanding, do nothing.
     fn read_write_byte(&self, val: u8) -> u8 {
-        let spi = &SpiRegisterManager::new(&self);
+        let spi = &SpiRegisterManager::new(self);
 
         self.write_byte(val);
         // Wait for receive data register full
@@ -603,13 +603,13 @@ impl spi::SpiMaster for SpiHw {
     }
 
     fn hold_low(&self) {
-        let spi = &SpiRegisterManager::new(&self);
+        let spi = &SpiRegisterManager::new(self);
         let csr = self.get_active_csr(spi);
         csr.modify(ChipSelectParams::CSAAT::ActiveAfterTransfer);
     }
 
     fn release_low(&self) {
-        let spi = &SpiRegisterManager::new(&self);
+        let spi = &SpiRegisterManager::new(self);
         let csr = self.get_active_csr(spi);
         csr.modify(ChipSelectParams::CSAAT::InactiveAfterTransfer);
     }
@@ -637,14 +637,14 @@ impl spi::SpiSlave for SpiHw {
     }
 
     fn init(&self) {
-        let spi = &SpiRegisterManager::new(&self);
+        let spi = &SpiRegisterManager::new(self);
         self.init_as_role(spi, SpiRole::SpiSlave);
     }
 
     /// This sets the value in the TDR register, to be sent as soon as the
     /// chip select pin is low.
     fn set_write_byte(&self, write_byte: u8) {
-        let spi = &SpiRegisterManager::new(&self);
+        let spi = &SpiRegisterManager::new(self);
         spi.registers.tdr.set(write_byte as u32);
     }
 

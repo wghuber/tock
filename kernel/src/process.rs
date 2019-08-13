@@ -688,7 +688,7 @@ impl<C: Chip> ProcessType for Process<'a, C> {
 
     fn setup_mpu(&self) {
         self.mpu_config.map(|config| {
-            self.chip.mpu().configure_mpu(&config);
+            self.chip.mpu().configure_mpu(config);
         });
     }
 

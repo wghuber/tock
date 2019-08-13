@@ -17,9 +17,9 @@ pub struct MuxI2C<'a> {
 
 impl I2CHwMasterClient for MuxI2C<'a> {
     fn command_complete(&self, buffer: &'static mut [u8], error: Error) {
-        self.inflight.take().map(move |device| {
+        if let Some(device) = self.inflight.take() {
             device.command_complete(buffer, error);
-        });
+        }
         self.do_next_op();
     }
 }
@@ -56,8 +56,8 @@ impl MuxI2C<'a> {
                 .devices
                 .iter()
                 .find(|node| node.operation.get() != Op::Idle);
-            mnode.map(|node| {
-                node.buffer.take().map(|buf| {
+            if let Some(node) = mnode {
+                if let Some(buf) = node.buffer.take() {
                     match node.operation.get() {
                         Op::Write(len) => self.i2c.write(node.addr, buf, len),
                         Op::Read(len) => self.i2c.read(node.addr, buf, len),
@@ -66,10 +66,10 @@ impl MuxI2C<'a> {
                         }
                         Op::Idle => {} // Can't get here...
                     }
-                });
+                }
                 node.operation.set(Op::Idle);
                 self.inflight.set(node);
-            });
+            }
         }
     }
 }

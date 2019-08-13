@@ -503,16 +503,16 @@ impl FLASHCALW {
 
             self.client.map(|client| match attempted_operation {
                 FlashState::Read => {
-                    self.buffer.take().map(|buffer| {
+                    if let Some(buffer) = self.buffer.take() {
                         client.read_complete(buffer, hil::flash::Error::FlashError);
-                    });
+                    }
                 }
                 FlashState::WriteUnlocking { .. }
                 | FlashState::WriteErasing { .. }
                 | FlashState::WriteWriting => {
-                    self.buffer.take().map(|buffer| {
+                    if let Some(buffer) = self.buffer.take() {
                         client.write_complete(buffer, hil::flash::Error::FlashError);
-                    });
+                    }
                 }
                 FlashState::EraseUnlocking { .. } | FlashState::EraseErasing => {
                     client.erase_complete(hil::flash::Error::FlashError);
@@ -527,9 +527,9 @@ impl FLASHCALW {
                 self.current_state.set(FlashState::Ready);
 
                 self.client.map(|client| {
-                    self.buffer.take().map(|buffer| {
+                    if let Some(buffer) = self.buffer.take() {
                         client.read_complete(buffer, hil::flash::Error::CommandComplete);
-                    });
+                    }
                 });
             }
             FlashState::WriteUnlocking { page } => {
@@ -555,9 +555,9 @@ impl FLASHCALW {
                 self.current_state.set(FlashState::Ready);
 
                 self.client.map(|client| {
-                    self.buffer.take().map(|buffer| {
+                    if let Some(buffer) = self.buffer.take() {
                         client.write_complete(buffer, hil::flash::Error::CommandComplete);
-                    });
+                    }
                 });
             }
             FlashState::EraseUnlocking { page } => {

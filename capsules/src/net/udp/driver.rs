@@ -261,8 +261,9 @@ impl<'a> UDPDriver<'a> {
     #[inline]
     #[allow(dead_code)]
     fn do_next_tx_queued(&self) {
-        self.get_next_tx_if_idle()
-            .map(|appid| self.perform_tx_async(appid));
+        if let Some(appid) = self.get_next_tx_if_idle() {
+            self.perform_tx_async(appid)
+        }
     }
 
     /// Schedule the next transmission if there is one pending. If the next
@@ -552,12 +553,12 @@ impl<'a> Driver for UDPDriver<'a> {
 
 impl<'a> UDPSendClient for UDPDriver<'a> {
     fn send_done(&self, result: ReturnCode) {
-        self.current_app.get().map(|appid| {
+        if let Some(appid) = self.current_app.get() {
             let _ = self.apps.enter(appid, |app, _| {
                 app.tx_callback
                     .map(|mut cb| cb.schedule(result.into(), 0, 0));
             });
-        });
+        }
         self.current_app.set(None);
         self.do_next_tx_queued();
     }
@@ -577,14 +578,14 @@ impl<'a> UDPRecvClient for UDPDriver<'a> {
                 let appid = app.appid();
                 self.do_with_app(app.appid(), |app| {
                     let mut for_me = false;
-                    app.bound_port.as_ref().map(|requested_addr| {
+                    if let Some(requested_addr) = app.bound_port.as_ref() {
                         if requested_addr.addr == dst_addr && requested_addr.port == dst_port {
                             for_me = true;
                         }
-                    });
+                    }
                     if for_me {
                         let mut app_read = app.app_read.take();
-                        app_read.as_mut().map(|rbuf| {
+                        if let Some(rbuf) = app_read.as_mut() {
                             let rbuf = rbuf.as_mut();
                             let len = payload.len();
                             if rbuf.len() >= len {
@@ -603,7 +604,7 @@ impl<'a> UDPRecvClient for UDPDriver<'a> {
                                 });
                                 app.rx_callback.map(|mut cb| cb.schedule(len, 0, 0));
                             }
-                        });
+                        }
                         app.app_read = app_read;
                     }
                     ReturnCode::SUCCESS

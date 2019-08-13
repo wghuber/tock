@@ -594,15 +594,14 @@ impl Usbc<'a> {
 
     /// Detach from the USB bus.  Also disable USB bus clock to save energy.
     fn _detach(&self) {
-        match self.get_state() {
-            State::Active(mode) => {
-                usbc_regs().udcon.modify(DeviceControl::DETACH::SET);
+        if let State::Active(mode) = self.get_state() {
+            usbc_regs().udcon.modify(DeviceControl::DETACH::SET);
 
-                scif::generic_clock_disable(scif::GenericClock::GCLK7);
+            scif::generic_clock_disable(scif::GenericClock::GCLK7);
 
-                self.set_state(State::Idle(mode));
-            }
-            _ => debug1!("Already detached"),
+            self.set_state(State::Idle(mode));
+        } else {
+            debug1!("Already detached");
         }
     }
 
@@ -782,9 +781,9 @@ impl Usbc<'a> {
             }
 
             // Alert the client
-            self.client.map(|client| {
+            if let Some(client) = self.client {
                 client.bus_reset();
-            });
+            }
 
             // Acknowledge the interrupt
             usbc_regs().udintclr.write(DeviceInterrupt::EORST::SET);
@@ -993,7 +992,9 @@ impl Usbc<'a> {
                         );
 
                         debug1!("\tep{}: NAKOUT", endpoint);
-                        self.client.map(|c| c.ctrl_status(endpoint));
+                        if let Some(c) = self.client {
+                            c.ctrl_status(endpoint)
+                        }
 
                         // Await end of Status stage
                         endpoint_enable_interrupts(endpoint, EndpointControl::RXOUTE::SET);
@@ -1096,7 +1097,9 @@ impl Usbc<'a> {
                         // Acknowledge
                         usbc_regs().uestaclr[endpoint].write(EndpointStatus::RXOUT::SET);
 
-                        self.client.map(|c| c.ctrl_status_complete(endpoint));
+                        if let Some(c) = self.client {
+                            c.ctrl_status_complete(endpoint)
+                        }
                     }
                 }
                 CtrlState::WriteOut => {
@@ -1171,7 +1174,9 @@ impl Usbc<'a> {
                             endpoint
                         );
 
-                        self.client.map(|c| c.ctrl_status(endpoint));
+                        if let Some(c) = self.client {
+                            c.ctrl_status(endpoint)
+                        }
 
                         // Send zero-length packet to acknowledge transaction
                         let bank = 0;
@@ -1196,7 +1201,9 @@ impl Usbc<'a> {
                         *ctrl_state = CtrlState::Init;
 
                         // for SetAddress, client must enable address after STATUS stage
-                        self.client.map(|c| c.ctrl_status_complete(endpoint));
+                        if let Some(c) = self.client {
+                            c.ctrl_status_complete(endpoint)
+                        }
                     }
                 }
                 CtrlState::InDelay => internal_err!("Not reached"),

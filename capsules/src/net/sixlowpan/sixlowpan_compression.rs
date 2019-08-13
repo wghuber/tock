@@ -295,16 +295,16 @@ fn compress_cie(
 ) {
     let mut cie: u8 = 0;
 
-    src_ctx.as_ref().map(|ctx| {
+    if let Some(ctx) = src_ctx.as_ref() {
         if ctx.id != 0 {
             cie |= ctx.id << 4;
         }
-    });
-    dst_ctx.as_ref().map(|ctx| {
+    }
+    if let Some(ctx) = dst_ctx.as_ref() {
         if ctx.id != 0 {
             cie |= ctx.id;
         }
-    });
+    }
 
     if cie != 0 {
         buf[1] |= iphc::CID;

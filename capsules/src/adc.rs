@@ -156,17 +156,17 @@ impl<A: hil::adc::Adc + hil::adc::AdcHighSpeed> Adc<'a, A> {
     /// closure - function to run on the found buffer
     fn take_and_map_buffer<F: FnOnce(&'static mut [u16])>(&self, closure: F) {
         if self.adc_buf1.is_some() {
-            self.adc_buf1.take().map(|val| {
+            if let Some(val) = self.adc_buf1.take() {
                 closure(val);
-            });
+            }
         } else if self.adc_buf2.is_some() {
-            self.adc_buf2.take().map(|val| {
+            if let Some(val) = self.adc_buf2.take() {
                 closure(val);
-            });
+            }
         } else if self.adc_buf3.is_some() {
-            self.adc_buf3.take().map(|val| {
+            if let Some(val) = self.adc_buf3.take() {
                 closure(val);
-            });
+            }
         }
     }
 
@@ -298,12 +298,12 @@ impl<A: hil::adc::Adc + hil::adc::AdcHighSpeed> Adc<'a, A> {
                     .sample_highspeed(chan, frequency, buf1, len1, buf2, len2);
                 if rc != ReturnCode::SUCCESS {
                     // store buffers again
-                    retbuf1.map(|buf| {
+                    if let Some(buf) = retbuf1 {
                         self.replace_buffer(buf);
-                    });
-                    retbuf2.map(|buf| {
+                    }
+                    if let Some(buf) = retbuf2 {
                         self.replace_buffer(buf);
-                    });
+                    }
                 }
                 rc
             })
@@ -399,12 +399,12 @@ impl<A: hil::adc::Adc + hil::adc::AdcHighSpeed> Adc<'a, A> {
                     .sample_highspeed(chan, frequency, buf1, len1, buf2, len2);
                 if rc != ReturnCode::SUCCESS {
                     // store buffers again
-                    retbuf1.map(|buf| {
+                    if let Some(buf) = retbuf1 {
                         self.replace_buffer(buf);
-                    });
-                    retbuf2.map(|buf| {
+                    }
+                    if let Some(buf) = retbuf2 {
                         self.replace_buffer(buf);
-                    });
+                    }
                 }
                 rc
             })
@@ -446,12 +446,12 @@ impl<A: hil::adc::Adc + hil::adc::AdcHighSpeed> Adc<'a, A> {
         let (rc, buf1, buf2) = self.adc.retrieve_buffers();
 
         // store buffers again
-        buf1.map(|buf| {
+        if let Some(buf) = buf1 {
             self.replace_buffer(buf);
-        });
-        buf2.map(|buf| {
+        }
+        if let Some(buf) = buf2 {
             self.replace_buffer(buf);
-        });
+        }
 
         // return result
         rc
@@ -592,9 +592,9 @@ impl<A: hil::adc::Adc + hil::adc::AdcHighSpeed> hil::adc::HighSpeedClient for Ad
                                     let (res, retbuf) =
                                         self.adc.provide_buffer(adc_buf, request_len);
                                     if res != ReturnCode::SUCCESS {
-                                        retbuf.map(|buf| {
+                                        if let Some(buf) = retbuf {
                                             self.replace_buffer(buf);
-                                        });
+                                        }
                                     }
                                 });
                             } else {

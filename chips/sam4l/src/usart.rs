@@ -516,9 +516,9 @@ impl USART<'a> {
             // alert client
             self.client.map(|usartclient| {
                 if let UsartClient::Uart(Some(rx), _tx) = usartclient {
-                    buffer
-                        .take()
-                        .map(|buf| rx.received_buffer(buf, length, rcode, error));
+                    if let Some(buf) = buffer {
+                        rx.received_buffer(buf, length, rcode, error);
+                    }
                 }
             });
         }
@@ -543,9 +543,9 @@ impl USART<'a> {
             // alert client
             self.client.map(|usartclient| {
                 if let UsartClient::Uart(_rx, Some(tx)) = usartclient {
-                    buffer
-                        .take()
-                        .map(|buf| tx.transmitted_buffer(buf, length, rcode));
+                    if let Some(buf) = buffer.take() {
+                        tx.transmitted_buffer(buf, length, rcode);
+                    }
                 }
             });
         }
@@ -779,7 +779,7 @@ impl dma::DMAClient for USART<'a> {
                     // alert client
                     self.client.map(|usartclient| {
                         if let UsartClient::Uart(Some(rx), _tx) = usartclient {
-                            buffer.map(|buf| {
+                            if let Some(buf) = buffer {
                                 let length = self.rx_len.get();
                                 self.rx_len.set(0);
                                 rx.received_buffer(
@@ -788,7 +788,7 @@ impl dma::DMAClient for USART<'a> {
                                     ReturnCode::SUCCESS,
                                     uart::Error::None,
                                 );
-                            });
+                            }
                         }
                     });
                 } else if pid == self.tx_dma_peripheral {
@@ -893,12 +893,10 @@ impl uart::Transmit<'a> for USART<'a> {
             self.usart_tx_state.set(USARTStateTX::DMA_Transmitting);
 
             // set up dma transfer and start transmission
-            if self.tx_dma.get().is_some() {
-                self.tx_dma.get().map(move |dma| {
-                    dma.enable();
-                    self.tx_len.set(tx_len);
-                    dma.do_transfer(self.tx_dma_peripheral, tx_buffer, tx_len);
-                });
+            if let Some(dma) = self.tx_dma.get() {
+                dma.enable();
+                self.tx_len.set(tx_len);
+                dma.do_transfer(self.tx_dma_peripheral, tx_buffer, tx_len);
                 (ReturnCode::SUCCESS, None)
             } else {
                 (ReturnCode::EOFF, Some(tx_buffer))
@@ -990,11 +988,11 @@ impl uart::ReceiveAdvanced<'a> for USART<'a> {
             self.enable_rx_timeout(usart, interbyte_timeout);
 
             // set up dma transfer and start reception
-            self.rx_dma.get().map(move |dma| {
+            if let Some(dma) = self.rx_dma.get() {
                 dma.enable();
                 dma.do_transfer(self.rx_dma_peripheral, rx_buffer, length);
                 self.rx_len.set(length);
-            });
+            }
             (ReturnCode::SUCCESS, None)
         }
     }
@@ -1066,35 +1064,33 @@ impl spi::SpiMaster for USART<'a> {
         );
 
         // Check if we should read and write or just write.
-        if read_buffer.is_some() {
+        if let Some(rbuf) = read_buffer {
             // We are reading and writing.
-            read_buffer.map(|rbuf| {
-                self.tx_dma.get().map(move |dma| {
-                    self.rx_dma.get().map(move |read| {
-                        // Do all the maps before starting anything in case
-                        // they take too much time.
+            if let Some(dma) = self.tx_dma.get() {
+                if let Some(read) = self.rx_dma.get() {
+                    // Do all the maps before starting anything in case
+                    // they take too much time.
 
-                        // Start the write transaction.
-                        self.usart_tx_state.set(USARTStateTX::DMA_Transmitting);
-                        self.usart_rx_state.set(USARTStateRX::Idle);
-                        dma.enable();
-                        dma.do_transfer(self.tx_dma_peripheral, write_buffer, count);
+                    // Start the write transaction.
+                    self.usart_tx_state.set(USARTStateTX::DMA_Transmitting);
+                    self.usart_rx_state.set(USARTStateRX::Idle);
+                    dma.enable();
+                    dma.do_transfer(self.tx_dma_peripheral, write_buffer, count);
 
-                        // Start the read transaction.
-                        self.usart_rx_state.set(USARTStateRX::DMA_Receiving);
-                        read.enable();
-                        read.do_transfer(self.rx_dma_peripheral, rbuf, count);
-                    });
-                });
-            });
+                    // Start the read transaction.
+                    self.usart_rx_state.set(USARTStateRX::DMA_Receiving);
+                    read.enable();
+                    read.do_transfer(self.rx_dma_peripheral, rbuf, count);
+                }
+            }
         } else {
             // We are just writing.
-            self.tx_dma.get().map(move |dma| {
+            if let Some(dma) = self.tx_dma.get() {
                 self.usart_tx_state.set(USARTStateTX::DMA_Transmitting);
                 self.usart_rx_state.set(USARTStateRX::Idle);
                 dma.enable();
                 dma.do_transfer(self.tx_dma_peripheral, write_buffer, count);
-            });
+            }
         }
 
         ReturnCode::SUCCESS

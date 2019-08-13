@@ -757,7 +757,7 @@ impl RxState<'a> {
         self.busy.set(false);
         self.bitmap.map(|bitmap| bitmap.clear());
         self.start_time.set(0);
-        client.map(move |client| {
+        if let Some(client) = client {
             // Since packet is borrowed from the upper layer, failing to return it
             // in the callback represents a significant error that should never
             // occur - all other calls to `packet.take()` replace the packet,
@@ -767,7 +767,7 @@ impl RxState<'a> {
                     client.receive(&packet, self.dgram_size.get() as usize, result);
                 })
                 .expect("Error: `packet` is None in call to end_receive.");
-        });
+        }
     }
 }
 
@@ -811,7 +811,9 @@ impl<A: time::Alarm, C: ContextStore> RxClient for Sixlowpan<'a, A, C> {
         );
         // Reception completed if rx_state is not None. Note that this can
         // also occur for some fail states (e.g. dropping an invalid packet)
-        rx_state.map(|state| state.end_receive(self.rx_client.get(), returncode));
+        if let Some(state) = rx_state {
+            state.end_receive(self.rx_client.get(), returncode)
+        }
     }
 }
 
@@ -983,7 +985,7 @@ impl<A: time::Alarm, C: ContextStore> Sixlowpan<'a, A, C> {
                 .iter()
                 .find(|state| !state.is_busy(self.clock.now(), A::Frequency::frequency()));
             // Initialize new state
-            rx_state.map(|state| {
+            if let Some(state) = rx_state {
                 state.start_receive(
                     src_mac_addr,
                     dst_mac_addr,
@@ -991,8 +993,7 @@ impl<A: time::Alarm, C: ContextStore> Sixlowpan<'a, A, C> {
                     dgram_tag,
                     self.clock.now(),
                 )
-            });
-            if rx_state.is_none() {
+            } else {
                 return (None, ReturnCode::ENOMEM);
             }
         }

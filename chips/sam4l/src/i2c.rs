@@ -502,11 +502,11 @@ impl ClockInterface for TWIMClock {
     }
 
     fn enable(&self) {
-        self.slave.map(|slave_clock| {
+        if let Some(slave_clock) = self.slave {
             if slave_clock.is_enabled() {
                 panic!("I2C: Request for master clock, but slave active");
             }
-        });
+        }
         self.master.enable();
     }
 
@@ -790,18 +790,18 @@ impl I2CHw {
                     }
                 }
 
-                err.map(|err| {
-                    self.master_client.get().map(|client| {
+                if let Some(err) = err {
+                    if let Some(client) = self.master_client.get() {
                         let buf = self.dma.and_then(|dma| {
                             let b = dma.abort_transfer();
                             self.dma.set(dma);
                             b
                         });
-                        buf.map(|buf| {
+                        if let Some(buf) = buf {
                             client.command_complete(buf, err);
-                        });
-                    });
-                });
+                        }
+                    }
+                }
             }
             Some((dma_periph, len)) => {
                 // Check to see if we are only trying to get one byte. If we
@@ -829,20 +829,20 @@ impl I2CHw {
                         twim.registers.rhr.read(ReceiveHolding::RXDATA) as u8
                     };
 
-                    err.map(|err| {
-                        self.master_client.get().map(|client| {
+                    if let Some(err) = err {
+                        if let Some(client) = self.master_client.get() {
                             let buf = self.dma.and_then(|dma| {
                                 let b = dma.abort_transfer();
                                 self.dma.set(dma);
                                 b
                             });
-                            buf.map(|buf| {
+                            if let Some(buf) = buf {
                                 // Save the already read byte.
                                 buf[0] = the_byte;
                                 client.command_complete(buf, err);
-                            });
-                        });
-                    });
+                            }
+                        }
+                    }
                 } else {
                     {
                         let twim = &TWIMRegisterManager::new(&self);
@@ -1061,9 +1061,9 @@ impl I2CHw {
                         twis.registers.scr.set(status.get());
                     } else {
                         // Call to upper layers asking for a buffer to send
-                        self.slave_client.get().map(|client| {
+                        if let Some(client) = self.slave_client.get() {
                             client.read_expected();
-                        });
+                        }
                     }
                 } else {
                     // Slave is in receive mode, AKA we got a write.
@@ -1082,9 +1082,9 @@ impl I2CHw {
                     } else {
                         // Call to upper layers asking for a buffer to
                         // read into.
-                        self.slave_client.get().map(|client| {
+                        if let Some(client) = self.slave_client.get() {
                             client.write_expected();
-                        });
+                        }
                     }
                 }
             } else {
@@ -1101,15 +1101,15 @@ impl I2CHw {
 
                     if status.is_set(StatusSlave::TRA) {
                         // read
-                        self.slave_client.get().map(|client| {
-                            self.slave_read_buffer.take().map(|buffer| {
+                        if let Some(client) = self.slave_client.get() {
+                            if let Some(buffer) = self.slave_read_buffer.take() {
                                 client.command_complete(
                                     buffer,
                                     nbytes as u8,
                                     hil::i2c::SlaveTransmissionType::Read,
                                 );
-                            });
-                        });
+                            }
+                        }
                     } else {
                         // write
 
@@ -1127,15 +1127,15 @@ impl I2CHw {
                             twis.registers.rhr.get();
                         }
 
-                        self.slave_client.get().map(|client| {
-                            self.slave_write_buffer.take().map(|buffer| {
+                        if let Some(client) = self.slave_client.get() {
+                            if let Some(buffer) = self.slave_write_buffer.take() {
                                 client.command_complete(
                                     buffer,
                                     nbytes as u8,
                                     hil::i2c::SlaveTransmissionType::Write,
                                 );
-                            });
-                        });
+                            }
+                        }
                     }
                 } else if interrupts.is_set(StatusSlave::BTF) {
                     // Byte transfer finished. Send the next byte from the

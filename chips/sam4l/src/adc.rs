@@ -791,7 +791,7 @@ impl hil::adc::Adc for Adc {
             self.rx_length.set(0);
 
             // store the buffer if it exists
-            dma_buffer.map(|dma_buf| {
+            if let Some(dma_buf) = dma_buffer {
                 // change buffer back into a [u16]
                 // the buffer was originally a [u16] so this should be okay
                 let buf_ptr = unsafe { mem::transmute::<*mut u8, *mut u16>(dma_buf.as_mut_ptr()) };
@@ -800,7 +800,7 @@ impl hil::adc::Adc for Adc {
                 // we'll place it here so we can return it to the higher level
                 // later in a `retrieve_buffers` call
                 self.stopped_buffer.replace(buf);
-            });
+            }
 
             ReturnCode::SUCCESS
         }
@@ -1010,7 +1010,7 @@ impl dma::DMAClient for Adc {
             // start a new transfer with the next buffer
             // we need to do this quickly in order to keep from missing samples.
             // At 175000 Hz, we only have 5.8 us (~274 cycles) to do so
-            self.next_dma_buffer.take().map(|buf| {
+            if let Some(buf) = self.next_dma_buffer.take() {
                 // first determine the buffer's length in samples
                 let dma_len = cmp::min(buf.len(), self.next_dma_length.get());
 
@@ -1043,11 +1043,11 @@ impl dma::DMAClient for Adc {
                     // so we can return it when `stop_sampling` is called
                     self.next_dma_buffer.replace(buf);
                 }
-            });
+            }
 
             // alert client
             self.client.map(|client| {
-                dma_buffer.map(|dma_buf| {
+                if let Some(dma_buf) = dma_buffer {
                     // change buffer back into a [u16]
                     // the buffer was originally a [u16] so this should be okay
                     let buf_ptr =
@@ -1058,7 +1058,7 @@ impl dma::DMAClient for Adc {
                     // send down another buffer to continue sampling, or stop
                     // sampling
                     client.samples_ready(buf, length);
-                });
+                }
             });
         }
     }

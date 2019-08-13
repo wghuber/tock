@@ -254,8 +254,10 @@ impl<'a> Eic<'a> {
     }
 
     /// Registers a client associated with a line.
-    pub fn set_client(&self, client: &'a hil::eic::Client, line: &Line) {
-        self.callbacks.get(*line as usize).map(|c| c.set(client));
+    pub fn set_client(&self, client: &'a hil::eic::Client, line: Line) {
+        if let Some(c) = self.callbacks.get(*line as usize) {
+            c.set(client)
+        }
     }
 
     /// Executes client function when an interrupt is triggered.

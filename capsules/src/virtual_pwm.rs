@@ -43,7 +43,7 @@ impl<P: hil::pwm::Pwm> MuxPwm<'a, P> {
     fn do_next_op(&self) {
         if self.inflight.is_none() {
             let mnode = self.devices.iter().find(|node| node.operation.is_some());
-            mnode.map(|node| {
+            if let Some(node) = mnode {
                 let started = node.operation.take().map_or(false, |operation| {
                     match operation {
                         Operation::Simple {
@@ -65,12 +65,12 @@ impl<P: hil::pwm::Pwm> MuxPwm<'a, P> {
                     // Keep looking for something to do.
                     self.do_next_op();
                 }
-            });
+            }
         } else {
             // We are running so we do whatever the inflight user wants, if
             // there is some command there.
             self.inflight.map(|node| {
-                node.operation.take().map(|operation| {
+                if let Some(operation) = node.operation.take() {
                     match operation {
                         Operation::Simple {
                             frequency_hz,
@@ -87,7 +87,7 @@ impl<P: hil::pwm::Pwm> MuxPwm<'a, P> {
                     }
                     // Recurse in case there is more to do.
                     self.do_next_op();
-                });
+                }
             });
         }
     }

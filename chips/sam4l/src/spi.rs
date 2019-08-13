@@ -460,12 +460,12 @@ impl SpiHw {
         // write_buffer length, the read_buffer length, and the user requested
         // len.
         let mut count: usize = len;
-        write_buffer
-            .as_ref()
-            .map(|buf| count = cmp::min(count, buf.len()));
-        read_buffer
-            .as_ref()
-            .map(|buf| count = cmp::min(count, buf.len()));
+        if let Some(buf) = write_buffer.as_ref() {
+            count = cmp::min(count, buf.len());
+        }
+        if let Some(buf) = read_buffer.as_ref() {
+            count = cmp::min(count, buf.len());
+        }
 
         // Configure DMA to transfer that many bytes.
         self.dma_length.set(count);
@@ -481,26 +481,26 @@ impl SpiHw {
         // SPI's baud rate, transfer_done does not capture the interrupt
         // signaling the RX is done - may be due to missing the first read
         // byte when you start read after write.
-        read_buffer.map(|rbuf| {
+        if let Some(rbuf) = read_buffer {
             self.transfers_in_progress
                 .set(self.transfers_in_progress.get() + 1);
             self.dma_read.map(move |read| {
                 read.enable();
                 read.do_transfer(DMAPeripheral::SPI_RX, rbuf, count);
             });
-        });
+        }
 
         // The ordering of these operations matters.
         // For transfers 4 bytes or longer, this will work as expected.
         // For shorter transfers, the first byte will be missing.
-        write_buffer.map(|wbuf| {
+        if let Some(wbuf) = write_buffer {
             self.transfers_in_progress
                 .set(self.transfers_in_progress.get() + 1);
             self.dma_write.map(move |write| {
                 write.enable();
                 write.do_transfer(DMAPeripheral::SPI_TX, wbuf, count);
             });
-        });
+        }
 
         ReturnCode::SUCCESS
     }
@@ -710,9 +710,9 @@ impl DMAClient for SpiHw {
             match self.role.get() {
                 SpiRole::SpiMaster => {
                     self.client.map(|cb| {
-                        txbuf.map(|txbuf| {
+                        if let Some(txbuf) = txbuf {
                             cb.read_write_done(txbuf, rxbuf, len);
-                        });
+                        }
                     });
                 }
                 SpiRole::SpiSlave => {

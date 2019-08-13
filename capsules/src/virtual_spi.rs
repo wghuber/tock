@@ -21,10 +21,10 @@ impl<Spi: hil::spi::SpiMaster> hil::spi::SpiMasterClient for MuxSpiMaster<'a, Sp
         read_buffer: Option<&'static mut [u8]>,
         len: usize,
     ) {
-        self.inflight.take().map(move |device| {
+        if let Some(device) = self.inflight.take() {
             self.do_next_op();
             device.read_write_done(write_buffer, read_buffer, len);
-        });
+        }
     }
 }
 
@@ -43,7 +43,7 @@ impl<Spi: hil::spi::SpiMaster> MuxSpiMaster<'a, Spi> {
                 .devices
                 .iter()
                 .find(|node| node.operation.get() != Op::Idle);
-            mnode.map(|node| {
+            if let Some(node) = mnode {
                 self.spi.specify_chip_select(node.chip_select.get());
                 let op = node.operation.get();
                 // Need to set idle here in case callback changes state
@@ -60,10 +60,10 @@ impl<Spi: hil::spi::SpiMaster> MuxSpiMaster<'a, Spi> {
                         // Only async operations want to block by setting
                         // the devices as inflight.
                         self.inflight.set(node);
-                        node.txbuffer.take().map(|txbuffer| {
+                        if let Some(txbuffer) = node.txbuffer.take() {
                             let rxbuffer = node.rxbuffer.take();
                             self.spi.read_write_bytes(txbuffer, rxbuffer, len);
-                        });
+                        }
                     }
                     Op::SetPolarity(pol) => {
                         self.spi.set_clock(pol);
@@ -76,7 +76,7 @@ impl<Spi: hil::spi::SpiMaster> MuxSpiMaster<'a, Spi> {
                     }
                     Op::Idle => {} // Can't get here...
                 }
-            });
+            }
         }
     }
 }

@@ -358,9 +358,9 @@ impl<'a> Acifc<'a> {
             // If Vinp > Vinn, throw an interrupt to the client and set the AC so
             // that it will throw an interrupt when Vinn < Vinp instead.
             if !regs.conf[0].is_set(ACConfiguration::IS) {
-                self.client.get().map(|client| {
+                if let Some(client) = self.client.get() {
                     client.fired(0);
-                });
+                }
                 regs.conf[0].modify(ACConfiguration::IS::WhenVinpLtVinn);
             }
             // If Vinp < Vinn, set the AC so that it will throw an interrupt when
@@ -385,9 +385,9 @@ impl<'a> Acifc<'a> {
             // If Vinp > Vinn, throw an interrupt to the client and set the AC so
             // that it will throw an interrupt when Vinn < Vinp instead.
             if !regs.conf[1].is_set(ACConfiguration::IS) {
-                self.client.get().map(|client| {
+                if let Some(client) = self.client.get() {
                     client.fired(1);
-                });
+                }
                 regs.conf[1].modify(ACConfiguration::IS::WhenVinpLtVinn);
             }
             // If Vinp < Vinn, set the AC so that it will throw an interrupt when
@@ -412,9 +412,9 @@ impl<'a> Acifc<'a> {
             // If Vinp > Vinn, throw an interrupt to the client and set the AC so
             // that it will throw an interrupt when Vinn < Vinp instead.
             if !regs.conf[2].is_set(ACConfiguration::IS) {
-                self.client.get().map(|client| {
+                if let Some(client) = self.client.get() {
                     client.fired(2);
-                });
+                }
                 regs.conf[2].modify(ACConfiguration::IS::WhenVinpLtVinn);
             }
             // If Vinp < Vinn, set the AC so that it will throw an interrupt when
@@ -439,9 +439,9 @@ impl<'a> Acifc<'a> {
             // If Vinp > Vinn, throw an interrupt to the client and set the AC so
             // that it will throw an interrupt when Vinn < Vinp instead.
             if !regs.conf[3].is_set(ACConfiguration::IS) {
-                self.client.get().map(|client| {
+                if let Some(client) = self.client.get() {
                     client.fired(3);
-                });
+                }
                 regs.conf[3].modify(ACConfiguration::IS::WhenVinpLtVinn);
             }
             // If Vinp < Vinn, set the AC so that it will throw an interrupt when

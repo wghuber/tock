@@ -118,17 +118,17 @@ pub unsafe fn panic_process_info<W: Write>(
 ) {
     // Print fault status once
     if !procs.is_empty() {
-        procs[0].as_ref().map(|process| {
+        if let Some(process) = procs[0].as_ref() {
             process.fault_fmt(writer);
-        });
+        }
     }
 
     // print data about each process
     let _ = writer.write_fmt(format_args!("\r\n---| App Status |---\r\n"));
     for idx in 0..procs.len() {
-        procs[idx].as_ref().map(|process| {
+        if let Some(process) = procs[idx].as_ref() {
             process.process_detail_fmt(writer);
-        });
+        }
     }
 }
 
@@ -289,7 +289,7 @@ impl DebugWriter {
     fn publish_str(&self) {
         // Can only publish if we have the output_buffer. If we don't that is
         // fine, we will do it when the transmit done callback happens.
-        self.output_buffer.take().map(|out_buffer| {
+        if let Some(out_buffer) = self.output_buffer.take() {
             let head = self.head.get();
             let tail = self.tail.get();
             let len = self
@@ -339,7 +339,7 @@ impl DebugWriter {
                     self.output_buffer.replace(opt.unwrap());
                 }
             }
-        });
+        }
     }
 
     fn extract(&self) -> Option<(usize, usize, &mut [u8])> {

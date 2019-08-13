@@ -41,23 +41,23 @@ pub struct MuxFlash<'a, F: hil::flash::Flash + 'static> {
 
 impl<F: hil::flash::Flash> hil::flash::Client<F> for MuxFlash<'a, F> {
     fn read_complete(&self, pagebuffer: &'static mut F::Page, error: hil::flash::Error) {
-        self.inflight.take().map(move |user| {
+        if let Some(user) = self.inflight.take() {
             user.read_complete(pagebuffer, error);
-        });
+        }
         self.do_next_op();
     }
 
     fn write_complete(&self, pagebuffer: &'static mut F::Page, error: hil::flash::Error) {
-        self.inflight.take().map(move |user| {
+        if let Some(user) = self.inflight.take() {
             user.write_complete(pagebuffer, error);
-        });
+        }
         self.do_next_op();
     }
 
     fn erase_complete(&self, error: hil::flash::Error) {
-        self.inflight.take().map(move |user| {
+        if let Some(user) = self.inflight.take() {
             user.erase_complete(error);
-        });
+        }
         self.do_next_op();
     }
 }
@@ -79,7 +79,7 @@ impl<F: hil::flash::Flash> MuxFlash<'a, F> {
                 .users
                 .iter()
                 .find(|node| node.operation.get() != Op::Idle);
-            mnode.map(|node| {
+            if let Some(node) = mnode {
                 node.buffer.take().map_or_else(
                     || {
                         // Don't need a buffer for erase.
@@ -107,7 +107,7 @@ impl<F: hil::flash::Flash> MuxFlash<'a, F> {
                 );
                 node.operation.set(Op::Idle);
                 self.inflight.set(node);
-            });
+            }
         }
     }
 }

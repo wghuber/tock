@@ -91,7 +91,7 @@ impl<'a> uart::ReceiveClient for MuxUart<'a> {
         // read.
         self.devices.iter().for_each(|device| {
             if device.receiver {
-                device.rx_buffer.take().map(|rxbuf| {
+                if let Some(rxbuf) = device.rx_buffer.take() {
                     let state = device.state.get();
                     // Copy the read into the buffer starting at rx_position
                     let position = device.rx_position.get();
@@ -107,13 +107,13 @@ impl<'a> uart::ReceiveClient for MuxUart<'a> {
                     }
                     device.rx_position.set(position + len);
                     device.rx_buffer.replace(rxbuf);
-                });
+                }
             }
         });
         self.buffer.replace(buffer);
         self.devices.iter().for_each(|device| {
             if device.receiver {
-                device.rx_buffer.take().map(|rxbuf| {
+                if let Some(rxbuf) = device.rx_buffer.take() {
                     let state = device.state.get();
                     let position = device.rx_position.get();
                     let remaining = device.rx_len.get() - position;
@@ -144,7 +144,7 @@ impl<'a> uart::ReceiveClient for MuxUart<'a> {
                         next_read_len = cmp::min(next_read_len, remaining);
                         read_pending = true;
                     }
-                });
+                }
             }
         });
         self.completing_read.set(false);
@@ -179,8 +179,8 @@ impl<'a> MuxUart<'a> {
     fn do_next_op(&self) {
         if self.inflight.is_none() {
             let mnode = self.devices.iter().find(|node| node.operation.is_some());
-            mnode.map(|node| {
-                node.tx_buffer.take().map(|buf| {
+            if let Some(node) = mnode {
+                if let Some(buf) = node.tx_buffer.take() {
                     node.operation.map(move |op| match op {
                         Operation::Transmit { len } => {
                             let (rcode, rbuf) = self.uart.transmit_buffer(buf, *len);
@@ -201,10 +201,10 @@ impl<'a> MuxUart<'a> {
                             }
                         }
                     });
-                });
+                }
                 node.operation.clear();
                 self.inflight.set(node);
-            });
+            }
         }
     }
 

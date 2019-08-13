@@ -1,5 +1,13 @@
 //! Tock Binary Format Header definitions and parsing code.
 
+// This lint checks for casting a pointer from a more specific memory location
+// (say a `*const u8`) to something larger (say a `*const u16`) which may not be
+// properly aligned anymore. We do this in several places in this file to parse
+// the application headers. To proceed we turn this off. Perhaps there is a way
+// to better manage the pointers to avoid casting them to larger sizes, but it
+// may not be entirely possible.
+#![allow(clippy::cast_ptr_alignment)]
+
 use core::{mem, slice, str};
 
 /// Takes a value and rounds it up to be aligned % 4

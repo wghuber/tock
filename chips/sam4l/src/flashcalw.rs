@@ -793,10 +793,7 @@ impl FLASHCALW {
             }
         });
     }
-}
 
-// Implementation of high level calls using the low-lv functions.
-impl FLASHCALW {
     pub fn configure(&mut self) {
         let regs: &FlashcalwRegisters = &*self.registers;
 

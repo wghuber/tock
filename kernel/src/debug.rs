@@ -244,6 +244,26 @@ impl DebugWriterWrapper {
             dw: MapCell::new(dw),
         }
     }
+
+    fn increment_count(&self) {
+        self.dw.map(|dw| {
+            dw.increment_count();
+        });
+    }
+
+    fn get_count(&self) -> usize {
+        self.dw.map_or(0, |dw| dw.get_count())
+    }
+
+    fn publish_str(&self) {
+        self.dw.map(|dw| {
+            dw.publish_str();
+        });
+    }
+
+    fn extract(&self) -> Option<(usize, usize, &mut [u8])> {
+        self.dw.map_or(None, |dw| dw.extract())
+    }
 }
 
 impl DebugWriter {
@@ -387,29 +407,6 @@ impl hil::uart::TransmitClient for DebugWriter {
         }
     }
     fn transmitted_word(&self, _rcode: ReturnCode) {}
-}
-
-/// Pass through functions.
-impl DebugWriterWrapper {
-    fn increment_count(&self) {
-        self.dw.map(|dw| {
-            dw.increment_count();
-        });
-    }
-
-    fn get_count(&self) -> usize {
-        self.dw.map_or(0, |dw| dw.get_count())
-    }
-
-    fn publish_str(&self) {
-        self.dw.map(|dw| {
-            dw.publish_str();
-        });
-    }
-
-    fn extract(&self) -> Option<(usize, usize, &mut [u8])> {
-        self.dw.map_or(None, |dw| dw.extract())
-    }
 }
 
 impl Write for DebugWriterWrapper {

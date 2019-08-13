@@ -18,8 +18,8 @@
 //! SHOULD be mixed and combined with a cryptographic hash function.
 //! A good, short reference on the difference between entropy and
 //! randomness as well as guidelines for high-entropy sources is
-//! Recommendations for Randomness in the Operating System: How to
-//! Keep Evil Children Out of Your Pool and Other Random Facts,
+//! "Recommendations for Randomness in the Operating System: How to
+//! Keep Evil Children Out of Your Pool and Other Random Facts",
 //! Corrigan-Gibbs et al., HotOS 2015.
 //!
 //! The interface is designed to work well with entropy generators

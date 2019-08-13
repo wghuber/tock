@@ -49,5 +49,6 @@ impl ClockInterface for NoClockControl {
     fn disable(&self) {}
 }
 
-/// Instance of NoClockControl for things that need references to `ClockInterface` objects
+/// Instance of `NoClockControl` for things that need references to
+/// `ClockInterface` objects
 pub static mut NO_CLOCK_CONTROL: NoClockControl = NoClockControl {};

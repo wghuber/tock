@@ -29,7 +29,7 @@
 //! unsafe impl ProcessManagementCapability for ProcessMgmtCap {}
 //! ```
 //!
-//! Now anything that has a ProcessMgmtCap can call any function that requires
+//! Now anything that has a `ProcessMgmtCap` can call any function that requires
 //! the `ProcessManagementCapability` capability.
 //!
 //! Requiring a certain capability is also straightforward:

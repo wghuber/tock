@@ -196,7 +196,7 @@ macro_rules! debug_gpio {
 ///////////////////////////////////////////////////////////////////
 // debug! and debug_verbose! support
 
-/// Wrapper type that we need a mutable reference to for the core::fmt::Write
+/// Wrapper type that we need a mutable reference to for the `core::fmt::Write`
 /// interface.
 pub struct DebugWriterWrapper {
     dw: MapCell<&'static DebugWriter>,

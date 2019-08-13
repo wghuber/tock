@@ -29,7 +29,7 @@
 //! holds a pointer to the actual address in memory. It also holds other
 //! information for the peripheral. Kernel traits will be implemented for this
 //! peripheral hardware structure. As the peripheral cannot derefence the raw
-//! MMIO pointer safely, Tock provides the PeripheralManager interface:
+//! MMIO pointer safely, Tock provides the `PeripheralManager` interface:
 //!
 //! ```rust
 //! # use kernel::common::cells::VolatileCell;
@@ -90,7 +90,7 @@
 //! Peripheral Clocks
 //! -----------------
 //!
-//! To facilitate low-power operation, PeripheralManager captures the peripheral's
+//! To facilitate low-power operation, `PeripheralManager` captures the peripheral's
 //! clock upon instantiation. The intention is to exploit
 //! [Ownership Based Resource Management](https://doc.rust-lang.org/beta/nomicon/obrm.html)
 //! to capture peripheral power state.
@@ -172,7 +172,7 @@ where
 }
 
 /// Structures encapsulating periphal hardware (those implementing the
-/// PeripheralManagement trait) should instantiate an instance of this
+/// `PeripheralManagement` trait) should instantiate an instance of this
 /// method to accesss memory mapped registers.
 ///
 /// ```

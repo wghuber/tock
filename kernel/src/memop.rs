@@ -8,7 +8,7 @@ use crate::returncode::ReturnCode;
 /// ### `memop_num`
 ///
 /// - `0`: BRK. Change the location of the program break and return a
-///   ReturnCode.
+///   `ReturnCode`.
 /// - `1`: SBRK. Change the location of the program break and return the
 ///   previous break address.
 /// - `2`: Get the address of the start of the application's RAM allocation.

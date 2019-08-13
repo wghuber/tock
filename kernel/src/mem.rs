@@ -12,7 +12,7 @@ pub struct Private;
 #[derive(Debug)]
 pub struct Shared;
 
-/// Base type for an AppSlice that holds the raw pointer to the memory region
+/// Base type for an `AppSlice` that holds the raw pointer to the memory region
 /// the app shared with the kernel.
 pub struct AppPtr<L, T> {
     ptr: Unique<T>,

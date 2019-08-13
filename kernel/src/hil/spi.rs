@@ -36,42 +36,45 @@ pub trait SpiMasterClient {
 /// The `SpiMaster` trait for interacting with SPI slave
 /// devices at a byte or buffer level.
 ///
-/// Using SpiMaster normally involves three steps:
+/// Using `SpiMaster` normally involves three steps:
 ///
 /// 1. Configure the SPI bus for a peripheral
-///    1a. Call set_chip_select to select which peripheral and
+///    1a. Call `set_chip_select()` to select which peripheral and
 ///        turn on SPI
 ///    1b. Call set operations as needed to configure bus
 ///    NOTE: You MUST select the chip select BEFORE configuring
 ///           SPI settings.
-/// 2. Invoke read, write, read_write on SpiMaster
-/// 3a. Call clear_chip_select to turn off bus, or
-/// 3b. Call set_chip_select to choose another peripheral,
+/// 2. Invoke `read()`, `write()`, `read_write()` on `SpiMaster`
+/// 3a. Call `clear_chip_select()` to turn off bus, or
+/// 3b. Call `set_chip_select()` to choose another peripheral,
 ///     go to step 1b or 2.
 ///
 /// This interface assumes that the SPI configuration for
 /// a particular peripheral persists across chip select. For
 /// example, with this set of calls:
 ///
-///   specify_chip_select(1);
-///   set_phase(SampleLeading);
-///   specify_chip_select(2);
-///   set_phase(SampleTrailing);
-///   specify_chip_select(1);
-///   write_byte(0); // Uses SampleLeading
+/// ```
+/// specify_chip_select(1);
+/// set_phase(SampleLeading);
+/// specify_chip_select(2);
+/// set_phase(SampleTrailing);
+/// specify_chip_select(1);
+/// write_byte(0); // Uses SampleLeading
+/// ```
 ///
 /// If additional chip selects are needed, they can be performed
 /// with GPIO and manual re-initialization of settings.
 ///
-///   specify_chip_select(0);
-///   set_phase(SampleLeading);
-///   pin_a.set();
-///   write_byte(0xaa); // Uses SampleLeading
-///   pin_a.clear();
-///   set_phase(SampleTrailing);
-///   pin_b.set();
-///   write_byte(0xaa); // Uses SampleTrailing
-///
+/// ```
+/// specify_chip_select(0);
+/// set_phase(SampleLeading);
+/// pin_a.set();
+/// write_byte(0xaa); // Uses SampleLeading
+/// pin_a.clear();
+/// set_phase(SampleTrailing);
+/// pin_b.set();
+/// write_byte(0xaa); // Uses SampleTrailing
+/// ```
 pub trait SpiMaster {
     type ChipSelect: Copy;
 
@@ -122,7 +125,7 @@ pub trait SpiMaster {
     fn release_low(&self);
 }
 
-/// SPIMasterDevice provides a chip-specific interface to the SPI Master
+/// `SpiMasterDevice` provides a chip-specific interface to the SPI Master
 /// hardware. The interface wraps the chip select line so that chip drivers
 /// cannot communicate with different SPI devices.
 pub trait SpiMasterDevice {
@@ -185,7 +188,7 @@ pub trait SpiSlave {
     fn get_phase(&self) -> ClockPhase;
 }
 
-/// SPISlaveDevice provides a chip-specific interface to the SPI Slave
+/// `SpiSlaveDevice` provides a chip-specific interface to the SPI Slave
 /// hardware. The interface wraps the chip select line so that chip drivers
 /// cannot communicate with different SPI devices.
 pub trait SpiSlaveDevice {

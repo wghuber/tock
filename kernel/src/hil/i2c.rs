@@ -68,14 +68,14 @@ pub trait I2CSlave {
 /// Master and Slave modes.
 pub trait I2CMasterSlave: I2CMaster + I2CSlave {}
 
-/// Client interface for capsules that use I2CMaster devices.
+/// Client interface for capsules that use `I2CMaster` devices.
 pub trait I2CHwMasterClient {
     /// Called when an I2C command completed. The `error` denotes whether the command completed
     /// successfully or if an error occured.
     fn command_complete(&self, buffer: &'static mut [u8], error: Error);
 }
 
-/// Client interface for capsules that use I2CSlave devices.
+/// Client interface for capsules that use `I2CSlave` devices.
 pub trait I2CHwSlaveClient {
     /// Called when an I2C command completed.
     fn command_complete(
@@ -111,7 +111,7 @@ pub trait I2CDevice {
     fn read(&self, buffer: &'static mut [u8], len: u8);
 }
 
-/// Client interface for I2CDevice implementations.
+/// Client interface for `I2CDevice` implementations.
 pub trait I2CClient {
     /// Called when an I2C command completed. The `error` denotes whether the command completed
     /// successfully or if an error occured.

@@ -48,7 +48,7 @@ pub trait Client {
 // *** Interfaces for high-speed, buffered ADC sampling ***
 
 /// Interface for continuously sampling at a given frequency on a channel.
-/// Requires the AdcSimple interface to have been implemented as well.
+/// Requires the `AdcSimple` interface to have been implemented as well.
 pub trait AdcHighSpeed: Adc {
     /// Start sampling continuously into buffers.
     /// Samples are double-buffered, going first into `buffer1` and then into

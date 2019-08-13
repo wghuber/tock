@@ -2,10 +2,10 @@
 //!
 //! Hardware independent interface for an 802.15.4 radio. Note that
 //! configuration commands are asynchronous and must be committed with a call to
-//! config_commit. For example, calling set_address will change the source
+//! `config_commit()`. For example, calling `set_address()` will change the source
 //! address of packets but does not change the address stored in hardware used
 //! for address recognition. This must be committed to hardware with a call to
-//! config_commit. Please see the relevant TRD for more details.
+//! `config_commit()`. Please see the relevant TRD for more details.
 
 use crate::returncode::ReturnCode;
 pub trait TxClient {

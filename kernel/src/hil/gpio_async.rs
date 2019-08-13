@@ -54,7 +54,7 @@ pub trait Port {
     fn disable_interrupt(&self, pin: usize) -> ReturnCode;
 }
 
-/// The gpio_async Client interface is used to both receive callbacks
+/// The `gpio_async::Client` interface is used to both receive callbacks
 /// when a configuration command finishes and to handle interrupt events
 /// from pins with interrupts enabled.
 pub trait Client {

@@ -178,7 +178,7 @@ impl TbfHeader {
     }
 }
 
-/// Converts a pointer to memory to a TbfHeader struct
+/// Converts a pointer to memory to a `TbfHeader` struct
 ///
 /// This function takes a pointer to arbitrary memory and optionally returns a
 /// TBF header struct. This function will validate the header checksum, but does

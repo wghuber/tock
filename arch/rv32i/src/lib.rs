@@ -9,6 +9,7 @@ pub mod machine_timer;
 pub mod plic;
 pub mod support;
 pub mod syscall;
+pub mod csr;
 
 extern "C" {
     // Where the end of the stack region is (and hence where the stack should

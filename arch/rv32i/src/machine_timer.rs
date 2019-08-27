@@ -58,19 +58,19 @@ impl MachineTimer<'a> {
     }
 }
 
-impl hil::time::Time for MachineTimer<'a> {
+impl hil::time::Time<u64> for MachineTimer<'a> {
     type Frequency = hil::time::Freq32KHz;
 
-    fn now(&self) -> u32 {
-        self.registers.mtime.get() as u32
+    fn now(&self) -> u64 {
+        self.registers.mtime.get()
     }
 
-    fn max_tics(&self) -> u32 {
-        core::u32::MAX
+    fn max_tics(&self) -> u64 {
+        core::u64::MAX
     }
 }
 
-impl hil::time::Alarm<'a> for MachineTimer<'a> {
+impl hil::time::Alarm<'a, u64> for MachineTimer<'a> {
     fn set_client(&self, client: &'a hil::time::AlarmClient) {
         self.client.set(client);
     }

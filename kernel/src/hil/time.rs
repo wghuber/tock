@@ -2,22 +2,42 @@
 
 use crate::ReturnCode;
 
-pub trait Time {
+/// Trait for the size (bits) of the underlying counter.
+pub trait Width {}
+
+// Most common width is `u32`, but `u64` is also possible on some platforms.
+// We define these here for convenience.
+impl Width for u32 {}
+impl Width for u64 {}
+
+/// Base trait for all time-like resources. This should likely never be
+/// implemented directly and instead provides common functions that `Counter`,
+/// `Alarm`, and `Timer` all use.
+pub trait Time<W: Width = u32> {
     type Frequency: Frequency;
 
     /// Returns the current time in hardware clock units.
-    fn now(&self) -> u32;
+    fn now(&self) -> W;
 
     /// Returns the wrap-around value of the clock.
     ///
-    /// The maximum value of the clock, at which `now` will wrap around. I.e., this should return
-    /// `core::u32::MAX` on a 32-bit-clock, or `1 << 24` for a 24-bit clock.
-    fn max_tics(&self) -> u32;
+    /// The maximum value of the clock, at which `now` will wrap around. I.e.,
+    /// this should return `core::u32::MAX` on a 32-bit-clock, or `1 << 24` for
+    /// a 24-bit clock.
+    fn max_tics(&self) -> W;
 }
 
+/// Trait for a simple incrementing counter.
 pub trait Counter: Time {
+    /// Start the counter running. This will cause it to start counting upwards
+    /// at its given frequency.
     fn start(&self) -> ReturnCode;
+
+    /// Stop the counter.
     fn stop(&self) -> ReturnCode;
+
+    /// Check if the counter is currently running and incrementing its counter
+    /// value.
     fn is_running(&self) -> bool;
 }
 
@@ -73,7 +93,7 @@ impl Frequency for Freq1KHz {
 /// (usually clock tics). Implementers should use the
 /// [`Client`](trait.Client.html) trait to signal when the counter has
 /// reached a pre-specified value set in [`set_alarm`](#tymethod.set_alarm).
-pub trait Alarm<'a>: Time {
+pub trait Alarm<'a, W: Width=u32>: Time<W> {
     /// Sets a one-shot alarm to fire when the clock reaches `tics`.
     ///
     /// [`Client#fired`](trait.Client.html#tymethod.fired) is signaled
@@ -125,7 +145,7 @@ pub trait AlarmClient {
 
 /// The `Timer` trait models a timer that can notify when a particular interval
 /// has elapsed.
-pub trait Timer<'a>: Time {
+pub trait Timer<'a, W: Width=u32>: Time<W> {
     /// Set the client for interrupt events.
     fn set_client(&'a self, client: &'a TimerClient);
 

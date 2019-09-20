@@ -84,7 +84,7 @@ register_bitfields![u32,
 
 pub struct Rtc {
     registers: StaticRef<RtcRegisters>,
-    callback: OptionalCell<&'static time::Client>,
+    callback: OptionalCell<&'static dyn time::Client>,
 }
 
 pub static mut RTC: Rtc = Rtc {
@@ -93,9 +93,9 @@ pub static mut RTC: Rtc = Rtc {
 };
 
 impl Controller for Rtc {
-    type Config = &'static time::Client;
+    type Config = &'static dyn time::Client;
 
-    fn configure(&self, client: &'static time::Client) {
+    fn configure(&self, client: &'static dyn time::Client) {
         self.callback.set(client);
 
         // FIXME: what to do here?
@@ -130,7 +130,7 @@ impl Rtc {
         });
     }
 
-    pub fn set_client(&self, client: &'static time::Client) {
+    pub fn set_client(&self, client: &'static dyn time::Client) {
         self.callback.set(client);
     }
 }

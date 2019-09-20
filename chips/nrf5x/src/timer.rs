@@ -213,7 +213,7 @@ pub trait CompareClient {
 
 pub struct Timer {
     registers: StaticRef<TimerRegisters>,
-    client: OptionalCell<&'static CompareClient>,
+    client: OptionalCell<&'static dyn CompareClient>,
 }
 
 impl Timer {
@@ -224,7 +224,7 @@ impl Timer {
         }
     }
 
-    pub fn set_client(&self, client: &'static CompareClient) {
+    pub fn set_client(&self, client: &'static dyn CompareClient) {
         self.client.set(client);
     }
 
@@ -260,7 +260,7 @@ impl Timer {
 
 pub struct TimerAlarm {
     registers: StaticRef<TimerRegisters>,
-    client: OptionalCell<&'static hil::time::Client>,
+    client: OptionalCell<&'static dyn hil::time::Client>,
 }
 
 // CC0 is used for capture
@@ -285,7 +285,7 @@ impl TimerAlarm {
         self.disable_interrupts();
     }
 
-    pub fn set_client(&self, client: &'static hil::time::Client) {
+    pub fn set_client(&self, client: &'static dyn hil::time::Client) {
         self.client.set(client);
     }
 

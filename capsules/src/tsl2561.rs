@@ -20,7 +20,8 @@ use kernel::hil::i2c;
 use kernel::{AppId, Callback, Driver, ReturnCode};
 
 /// Syscall driver number.
-pub const DRIVER_NUM: usize = 0x70000;
+use crate::driver;
+pub const DRIVER_NUM: usize = driver::NUM::Tsl2561 as usize;
 
 // Buffer to use for I2C messages
 pub static mut BUFFER: [u8; 4] = [0; 4];
@@ -201,8 +202,8 @@ enum State {
 }
 
 pub struct TSL2561<'a> {
-    i2c: &'a i2c::I2CDevice,
-    interrupt_pin: &'a gpio::InterruptPin,
+    i2c: &'a dyn i2c::I2CDevice,
+    interrupt_pin: &'a dyn gpio::InterruptPin,
     callback: OptionalCell<Callback>,
     state: Cell<State>,
     buffer: TakeCell<'static, [u8]>,
@@ -210,8 +211,8 @@ pub struct TSL2561<'a> {
 
 impl TSL2561<'a> {
     pub fn new(
-        i2c: &'a i2c::I2CDevice,
-        interrupt_pin: &'a gpio::InterruptPin,
+        i2c: &'a dyn i2c::I2CDevice,
+        interrupt_pin: &'a dyn gpio::InterruptPin,
         buffer: &'static mut [u8],
     ) -> TSL2561<'a> {
         // setup and return struct

@@ -28,7 +28,7 @@ const FAULT_RESPONSE: kernel::procs::FaultResponse = kernel::procs::FaultRespons
 static mut APP_MEMORY: [u8; 8192] = [0; 8192];
 
 // Actual memory for holding the active process structures.
-static mut PROCESSES: [Option<&'static kernel::procs::ProcessType>; NUM_PROCS] =
+static mut PROCESSES: [Option<&'static dyn kernel::procs::ProcessType>; NUM_PROCS] =
     [None, None, None, None];
 
 /// Dummy buffer that causes the linker to reserve enough space for the stack.
@@ -43,7 +43,7 @@ struct ArtyE21 {
     gpio: &'static capsules::gpio::GPIO<'static>,
     alarm: &'static capsules::alarm::AlarmDriver<
         'static,
-        VirtualMuxAlarm<'static, rv32i::machine_timer::MachineTimer>,
+        VirtualMuxAlarm<'static, rv32i::machine_timer::MachineTimer<'static>>,
     >,
     led: &'static capsules::led::LED<'static>,
     button: &'static capsules::button::Button<'static>,
@@ -54,7 +54,7 @@ struct ArtyE21 {
 impl Platform for ArtyE21 {
     fn with_driver<F, R>(&self, driver_num: usize, f: F) -> R
     where
-        F: FnOnce(Option<&kernel::Driver>) -> R,
+        F: FnOnce(Option<&dyn kernel::Driver>) -> R,
     {
         match driver_num {
             capsules::console::DRIVER_NUM => f(Some(self.console)),
@@ -130,7 +130,7 @@ pub unsafe fn reset_handler() {
         MuxAlarm<'static, rv32i::machine_timer::MachineTimer>,
         MuxAlarm::new(&rv32i::machine_timer::MACHINETIMER)
     );
-    rv32i::machine_timer::MACHINETIMER.set_client(mux_alarm);
+    hil::time::Alarm::set_client(&rv32i::machine_timer::MACHINETIMER, mux_alarm);
 
     // Alarm
     let virtual_alarm_user = static_init!(
@@ -147,7 +147,7 @@ pub unsafe fn reset_handler() {
             board_kernel.create_grant(&memory_allocation_cap)
         )
     );
-    virtual_alarm_user.set_client(alarm);
+    hil::time::Alarm::set_client(virtual_alarm_user, alarm);
 
     // TEST for timer
     //
@@ -164,7 +164,7 @@ pub unsafe fn reset_handler() {
     // LEDs
     let led_pins = static_init!(
         [(
-            &'static kernel::hil::gpio::Pin,
+            &'static dyn kernel::hil::gpio::Pin,
             capsules::led::ActivationMode
         ); 3],
         [
@@ -193,7 +193,7 @@ pub unsafe fn reset_handler() {
     // BUTTONs
     let button_pins = static_init!(
         [(
-            &'static kernel::hil::gpio::InterruptValuePin,
+            &'static dyn kernel::hil::gpio::InterruptValuePin,
             capsules::button::GpioMode
         ); 1],
         [(
@@ -218,7 +218,7 @@ pub unsafe fn reset_handler() {
 
     // set GPIO driver controlling remaining GPIO pins
     let gpio_pins = static_init!(
-        [&'static kernel::hil::gpio::InterruptValuePin; 3],
+        [&'static dyn kernel::hil::gpio::InterruptValuePin; 3],
         [
             static_init!(
                 kernel::hil::gpio::InterruptValueWrapper,

@@ -5,7 +5,7 @@ use core::fmt::Write;
 use core::ptr::write_volatile;
 use core::{mem, ptr, slice, str};
 
-use crate::callback::AppId;
+use crate::callback::{AppId, CallbackId};
 use crate::capabilities::ProcessManagementCapability;
 use crate::common::cells::MapCell;
 use crate::common::{Queue, RingBuffer};
@@ -33,9 +33,9 @@ pub fn load_processes<C: Chip>(
     chip: &'static C,
     start_of_flash: *const u8,
     app_memory: &mut [u8],
-    procs: &'static mut [Option<&'static ProcessType>],
+    procs: &'static mut [Option<&'static dyn ProcessType>],
     fault_response: FaultResponse,
-    _capability: &ProcessManagementCapability,
+    _capability: &dyn ProcessManagementCapability,
 ) {
     let mut apps_in_flash_ptr = start_of_flash;
     let mut app_memory_ptr = app_memory.as_mut_ptr();
@@ -91,6 +91,10 @@ pub trait ProcessType {
     /// If there are no `Task`s in the queue for this process this will return
     /// `None`.
     fn dequeue_task(&self) -> Option<Task>;
+
+    /// Remove all scheduled callbacks for a given callback id from the task
+    /// queue.
+    fn remove_pending_callbacks(&self, callback_id: CallbackId);
 
     /// Returns the current state the process is in. Common states are "running"
     /// or "yielded".
@@ -194,7 +198,7 @@ pub trait ProcessType {
 
     /// Create new memory in the grant region, and check that the MPU region
     /// covering program memory does not extend past the kernel memory break.
-    unsafe fn alloc(&self, size: usize) -> Option<&mut [u8]>;
+    unsafe fn alloc(&self, size: usize, align: usize) -> Option<&mut [u8]>;
 
     unsafe fn free(&self, _: *mut u8);
 
@@ -213,8 +217,8 @@ pub trait ProcessType {
     /// Context switch to a specific process.
     unsafe fn switch_to(&self) -> Option<syscall::ContextSwitchReason>;
 
-    unsafe fn fault_fmt(&self, writer: &mut Write);
-    unsafe fn process_detail_fmt(&self, writer: &mut Write);
+    unsafe fn fault_fmt(&self, writer: &mut dyn Write);
+    unsafe fn process_detail_fmt(&self, writer: &mut dyn Write);
 
     // debug
 
@@ -327,14 +331,28 @@ pub enum Task {
     IPC((AppId, IPCType)),
 }
 
+/// Enumeration to identify whether a function call comes directly from the
+/// kernel or from a callback subscribed through a driver.
+///
+/// An example of kernel function is the application entry point.
+#[derive(Copy, Clone, Debug)]
+pub enum FunctionCallSource {
+    Kernel, // For functions coming directly from the kernel, such as `init_fn`.
+    Driver(CallbackId),
+}
+
 /// Struct that defines a callback that can be passed to a process. The callback
 /// takes four arguments that are `Driver` and callback specific, so they are
 /// represented generically here.
 ///
 /// Likely these four arguments will get passed as the first four register
 /// values, but this is architecture-dependent.
+///
+/// A `FunctionCall` also identifies the callback that scheduled it, if any, so
+/// that it can be unscheduled when the process unsubscribes from this callback.
 #[derive(Copy, Clone, Debug)]
 pub struct FunctionCall {
+    pub source: FunctionCallSource,
     pub argument0: usize,
     pub argument1: usize,
     pub argument2: usize,
@@ -500,6 +518,20 @@ impl<C: Chip> ProcessType for Process<'a, C> {
         ret
     }
 
+    fn remove_pending_callbacks(&self, callback_id: CallbackId) {
+        self.tasks.map(|tasks| {
+            tasks.retain(|task| match task {
+                // Remove only tasks that are function calls with an id equal
+                // to `callback_id`.
+                Task::FunctionCall(function_call) => match function_call.source {
+                    FunctionCallSource::Kernel => true,
+                    FunctionCallSource::Driver(id) => id != callback_id,
+                },
+                _ => true,
+            });
+        });
+    }
+
     fn get_state(&self) -> State {
         self.state.get()
     }
@@ -584,7 +616,9 @@ impl<C: Chip> ProcessType for Process<'a, C> {
                 let flash_app_start = app_flash_address as usize + flash_protected_size;
 
                 self.tasks.map(|tasks| {
+                    tasks.empty();
                     tasks.enqueue(Task::FunctionCall(FunctionCall {
+                        source: FunctionCallSource::Kernel,
                         pc: init_fn,
                         argument0: flash_app_start,
                         argument1: self.memory.as_ptr() as usize,
@@ -775,9 +809,13 @@ impl<C: Chip> ProcessType for Process<'a, C> {
         }
     }
 
-    unsafe fn alloc(&self, size: usize) -> Option<&mut [u8]> {
+    unsafe fn alloc(&self, size: usize, align: usize) -> Option<&mut [u8]> {
         self.mpu_config.and_then(|mut config| {
-            let new_break = self.kernel_memory_break.get().offset(-(size as isize));
+            let new_break_unaligned = self.kernel_memory_break.get().offset(-(size as isize));
+            // The alignment must be a power of two, 2^a. The expression `!(align - 1)` then
+            // returns a mask with leading ones, followed by `a` trailing zeros.
+            let alignment_mask = !(align - 1);
+            let new_break = (new_break_unaligned as usize & alignment_mask) as *const u8;
             if new_break < self.app_break.get() {
                 None
             } else if let Err(_) = self.chip.mpu().update_app_memory_region(
@@ -796,6 +834,7 @@ impl<C: Chip> ProcessType for Process<'a, C> {
 
     unsafe fn free(&self, _: *mut u8) {}
 
+    #[allow(clippy::cast_ptr_alignment)]
     unsafe fn grant_ptr(&self, grant_num: usize) -> *mut *mut u8 {
         let grant_num = grant_num as isize;
         (self.mem_end() as *mut *mut u8).offset(-(grant_num + 1))
@@ -919,11 +958,11 @@ impl<C: Chip> ProcessType for Process<'a, C> {
             .map(|debug| debug.timeslice_expiration_count += 1);
     }
 
-    unsafe fn fault_fmt(&self, writer: &mut Write) {
+    unsafe fn fault_fmt(&self, writer: &mut dyn Write) {
         self.chip.userspace_kernel_boundary().fault_fmt(writer);
     }
 
-    unsafe fn process_detail_fmt(&self, writer: &mut Write) {
+    unsafe fn process_detail_fmt(&self, writer: &mut dyn Write) {
         // Flash
         let flash_end = self.flash.as_ptr().add(self.flash.len()) as usize;
         let flash_start = self.flash.as_ptr() as usize;
@@ -1062,6 +1101,7 @@ impl<C: Chip> ProcessType for Process<'a, C> {
 }
 
 impl<C: 'static + Chip> Process<'a, C> {
+    #[allow(clippy::cast_ptr_alignment)]
     crate unsafe fn create(
         kernel: &'static Kernel,
         chip: &'static C,
@@ -1070,7 +1110,7 @@ impl<C: 'static + Chip> Process<'a, C> {
         remaining_app_memory_size: usize,
         fault_response: FaultResponse,
         index: usize,
-    ) -> (Option<&'static ProcessType>, usize, usize) {
+    ) -> (Option<&'static dyn ProcessType>, usize, usize) {
         if let Some(tbf_header) = tbfheader::parse_and_validate_tbf_header(app_flash_address) {
             let app_flash_size = tbf_header.get_total_size() as usize;
 
@@ -1241,6 +1281,7 @@ impl<C: 'static + Chip> Process<'a, C> {
 
             process.tasks.map(|tasks| {
                 tasks.enqueue(Task::FunctionCall(FunctionCall {
+                    source: FunctionCallSource::Kernel,
                     pc: init_fn,
                     argument0: flash_app_start,
                     argument1: process.memory.as_ptr() as usize,
@@ -1280,6 +1321,7 @@ impl<C: 'static + Chip> Process<'a, C> {
         (None, 0, 0)
     }
 
+    #[allow(clippy::cast_ptr_alignment)]
     fn sp(&self) -> *const usize {
         self.current_stack_pointer.get() as *const usize
     }
@@ -1298,6 +1340,7 @@ impl<C: 'static + Chip> Process<'a, C> {
     }
 
     /// Reset all `grant_ptr`s to NULL.
+    #[allow(clippy::cast_ptr_alignment)]
     unsafe fn grant_ptrs_reset(&self) {
         let grant_ptrs_num = self.kernel.get_grant_count_and_finalize();
         for grant_num in 0..grant_ptrs_num {

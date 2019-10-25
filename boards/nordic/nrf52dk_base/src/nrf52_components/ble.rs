@@ -15,6 +15,7 @@ use nrf5x::rtc::Rtc;
 
 use kernel::capabilities;
 use kernel::component::Component;
+use kernel::hil;
 use kernel::{create_capability, static_init};
 
 // Save some deep nesting
@@ -22,7 +23,7 @@ use kernel::{create_capability, static_init};
 pub struct BLEComponent {
     board_kernel: &'static kernel::Kernel,
     radio: &'static nrf52::ble_radio::Radio,
-    mux_alarm: &'static capsules::virtual_alarm::MuxAlarm<'static, nrf5x::rtc::Rtc>,
+    mux_alarm: &'static capsules::virtual_alarm::MuxAlarm<'static, nrf5x::rtc::Rtc<'static>>,
 }
 
 impl BLEComponent {
@@ -40,13 +41,14 @@ impl BLEComponent {
 }
 
 impl Component for BLEComponent {
+    type StaticInput = ();
     type Output = &'static capsules::ble_advertising_driver::BLE<
         'static,
         nrf52::ble_radio::Radio,
-        VirtualMuxAlarm<'static, Rtc>,
+        VirtualMuxAlarm<'static, Rtc<'static>>,
     >;
 
-    unsafe fn finalize(&mut self) -> Self::Output {
+    unsafe fn finalize(&mut self, _s: Self::StaticInput) -> Self::Output {
         let grant_cap = create_capability!(capabilities::MemoryAllocationCapability);
 
         let ble_radio_virtual_alarm = static_init!(
@@ -75,7 +77,7 @@ impl Component for BLEComponent {
             &nrf52::ble_radio::RADIO,
             ble_radio,
         );
-        ble_radio_virtual_alarm.set_client(ble_radio);
+        hil::time::Alarm::set_client(ble_radio_virtual_alarm, ble_radio);
 
         ble_radio
     }

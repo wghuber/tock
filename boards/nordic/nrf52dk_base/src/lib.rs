@@ -11,8 +11,6 @@ use capsules::virtual_uart::{MuxUart, UartDevice};
 use kernel::capabilities;
 use kernel::component::Component;
 use kernel::hil;
-use kernel::hil::entropy::Entropy32;
-use kernel::hil::rng::Rng;
 use nrf5x::rtc::Rtc;
 
 use kernel::common::dynamic_deferred_call::{DynamicDeferredCall, DynamicDeferredCallClientState};
@@ -77,9 +75,9 @@ pub struct Platform {
     ble_radio: &'static capsules::ble_advertising_driver::BLE<
         'static,
         nrf52::ble_radio::Radio,
-        VirtualMuxAlarm<'static, Rtc>,
+        VirtualMuxAlarm<'static, Rtc<'static>>,
     >,
-    ieee802154_radio: &'static capsules::ieee802154::RadioDriver<'static>,
+    ieee802154_radio: Option<&'static capsules::ieee802154::RadioDriver<'static>>,
     button: &'static capsules::button::Button<'static>,
     console: &'static capsules::console::Console<'static>,
     gpio: &'static capsules::gpio::GPIO<'static>,
@@ -89,7 +87,7 @@ pub struct Platform {
     ipc: kernel::ipc::IPC,
     alarm: &'static capsules::alarm::AlarmDriver<
         'static,
-        capsules::virtual_alarm::VirtualMuxAlarm<'static, nrf5x::rtc::Rtc>,
+        capsules::virtual_alarm::VirtualMuxAlarm<'static, nrf5x::rtc::Rtc<'static>>,
     >,
     // The nRF52dk does not have the flash chip on it, so we make this optional.
     nonvolatile_storage:
@@ -99,7 +97,7 @@ pub struct Platform {
 impl kernel::Platform for Platform {
     fn with_driver<F, R>(&self, driver_num: usize, f: F) -> R
     where
-        F: FnOnce(Option<&kernel::Driver>) -> R,
+        F: FnOnce(Option<&dyn kernel::Driver>) -> R,
     {
         match driver_num {
             capsules::console::DRIVER_NUM => f(Some(self.console)),
@@ -109,7 +107,10 @@ impl kernel::Platform for Platform {
             capsules::button::DRIVER_NUM => f(Some(self.button)),
             capsules::rng::DRIVER_NUM => f(Some(self.rng)),
             capsules::ble_advertising_driver::DRIVER_NUM => f(Some(self.ble_radio)),
-            capsules::ieee802154::DRIVER_NUM => f(Some(self.ieee802154_radio)),
+            capsules::ieee802154::DRIVER_NUM => match self.ieee802154_radio {
+                Some(radio) => f(Some(radio)),
+                None => f(None),
+            },
             capsules::temperature::DRIVER_NUM => f(Some(self.temp)),
             capsules::nonvolatile_storage_driver::DRIVER_NUM => {
                 f(self.nonvolatile_storage.map_or(None, |nv| Some(nv)))
@@ -125,23 +126,24 @@ impl kernel::Platform for Platform {
 pub unsafe fn setup_board(
     board_kernel: &'static kernel::Kernel,
     button_rst_pin: usize,
-    gpio_pins: &'static mut [&'static kernel::hil::gpio::InterruptValuePin],
+    gpio_pins: &'static mut [&'static dyn kernel::hil::gpio::InterruptValuePin],
     debug_pin1_index: usize,
     debug_pin2_index: usize,
     debug_pin3_index: usize,
     led_pins: &'static mut [(
-        &'static kernel::hil::gpio::Pin,
+        &'static dyn kernel::hil::gpio::Pin,
         capsules::led::ActivationMode,
     )],
     uart_pins: &UartPins,
     spi_pins: &SpiPins,
     mx25r6435f: &Option<SpiMX25R6435FPins>,
     button_pins: &'static mut [(
-        &'static kernel::hil::gpio::InterruptValuePin,
+        &'static dyn kernel::hil::gpio::InterruptValuePin,
         capsules::button::GpioMode,
     )],
+    ieee802154: bool,
     app_memory: &mut [u8],
-    process_pointers: &'static mut [Option<&'static kernel::procs::ProcessType>],
+    process_pointers: &'static mut [Option<&'static dyn kernel::procs::ProcessType>],
     app_fault_response: kernel::procs::FaultResponse,
 ) {
     // Make non-volatile memory writable and activate the reset button
@@ -204,23 +206,10 @@ pub unsafe fn setup_board(
         capsules::virtual_alarm::MuxAlarm<'static, nrf5x::rtc::Rtc>,
         capsules::virtual_alarm::MuxAlarm::new(&nrf5x::rtc::RTC)
     );
-    rtc.set_client(mux_alarm);
+    hil::time::Alarm::set_client(rtc, mux_alarm);
 
-    let virtual_alarm1 = static_init!(
-        capsules::virtual_alarm::VirtualMuxAlarm<'static, nrf5x::rtc::Rtc>,
-        capsules::virtual_alarm::VirtualMuxAlarm::new(mux_alarm)
-    );
-    let alarm = static_init!(
-        capsules::alarm::AlarmDriver<
-            'static,
-            capsules::virtual_alarm::VirtualMuxAlarm<'static, nrf5x::rtc::Rtc>,
-        >,
-        capsules::alarm::AlarmDriver::new(
-            virtual_alarm1,
-            board_kernel.create_grant(&memory_allocation_capability)
-        )
-    );
-    virtual_alarm1.set_client(alarm);
+    let alarm = components::alarm::AlarmDriverComponent::new(board_kernel, mux_alarm)
+        .finalize(components::alarm_component_helper!(nrf5x::rtc::Rtc));
 
     // Create a shared UART channel for the console and for kernel debug.
     let uart_mux = static_init!(
@@ -276,15 +265,21 @@ pub unsafe fn setup_board(
     );
     kernel::debug::set_debug_writer_wrapper(debug_wrapper);
 
-    let ble_radio = BLEComponent::new(board_kernel, &nrf52::ble_radio::RADIO, mux_alarm).finalize();
+    let ble_radio =
+        BLEComponent::new(board_kernel, &nrf52::ble_radio::RADIO, mux_alarm).finalize(());
 
-    let (ieee802154_radio, _) = Ieee802154Component::new(
-        board_kernel,
-        &nrf52::ieee802154_radio::RADIO,
-        PAN_ID,
-        SRC_MAC,
-    )
-    .finalize();
+    let ieee802154_radio = if ieee802154 {
+        let (radio, _) = Ieee802154Component::new(
+            board_kernel,
+            &nrf52::ieee802154_radio::RADIO,
+            PAN_ID,
+            SRC_MAC,
+        )
+        .finalize(());
+        Some(radio)
+    } else {
+        None
+    };
 
     let temp = static_init!(
         capsules::temperature::TemperatureSensor<'static>,
@@ -295,20 +290,7 @@ pub unsafe fn setup_board(
     );
     kernel::hil::sensors::TemperatureDriver::set_client(&nrf5x::temperature::TEMP, temp);
 
-    let entropy_to_random = static_init!(
-        capsules::rng::Entropy32ToRandom<'static>,
-        capsules::rng::Entropy32ToRandom::new(&nrf5x::trng::TRNG)
-    );
-
-    let rng = static_init!(
-        capsules::rng::RngDriver<'static>,
-        capsules::rng::RngDriver::new(
-            entropy_to_random,
-            board_kernel.create_grant(&memory_allocation_capability)
-        )
-    );
-    nrf5x::trng::TRNG.set_client(entropy_to_random);
-    entropy_to_random.set_client(rng);
+    let rng = components::rng::RngComponent::new(board_kernel, &nrf5x::trng::TRNG).finalize(());
 
     // SPI
     let mux_spi = static_init!(
@@ -357,7 +339,7 @@ pub unsafe fn setup_board(
             )
         );
         mx25r6435f_spi.set_client(mx25r6435f);
-        mx25r6435f_virtual_alarm.set_client(mx25r6435f);
+        hil::time::Alarm::set_client(mx25r6435f_virtual_alarm, mx25r6435f);
 
         pub static mut FLASH_PAGEBUFFER: capsules::mx25r6435f::Mx25r6435fSector =
             capsules::mx25r6435f::Mx25r6435fSector::new();

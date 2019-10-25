@@ -1,3 +1,5 @@
+//! General Purpose Input/Output driver.
+
 use kernel::common::cells::OptionalCell;
 use kernel::common::registers::{register_bitfields, Field, FieldValue, ReadOnly, ReadWrite};
 use kernel::common::StaticRef;
@@ -83,7 +85,7 @@ pub struct GpioPin {
     pin: Field<u32, pins::Register>,
     set: FieldValue<u32, pins::Register>,
     clear: FieldValue<u32, pins::Register>,
-    client: OptionalCell<&'static hil::gpio::Client>,
+    client: OptionalCell<&'static dyn hil::gpio::Client>,
 }
 
 impl GpioPin {
@@ -256,7 +258,7 @@ impl hil::gpio::Output for GpioPin {
 }
 
 impl hil::gpio::Interrupt for GpioPin {
-    fn set_client(&self, client: &'static hil::gpio::Client) {
+    fn set_client(&self, client: &'static dyn hil::gpio::Client) {
         self.client.set(client);
     }
 

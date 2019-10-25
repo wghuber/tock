@@ -16,7 +16,8 @@ const MAX_NEIGHBORS: usize = 4;
 const MAX_KEYS: usize = 4;
 
 /// Syscall number
-pub const DRIVER_NUM: usize = 0x30001;
+use crate::driver;
+pub const DRIVER_NUM: usize = driver::NUM::Ieee802154 as usize;
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 struct DeviceDescriptor {
@@ -168,7 +169,7 @@ impl Default for App {
 
 pub struct RadioDriver<'a> {
     /// Underlying MAC device, possibly multiplexed
-    mac: &'a device::MacDevice<'a>,
+    mac: &'a dyn device::MacDevice<'a>,
 
     /// List of (short address, long address) pairs representing IEEE 802.15.4
     /// neighbors.
@@ -193,7 +194,7 @@ pub struct RadioDriver<'a> {
 
 impl RadioDriver<'a> {
     pub fn new(
-        mac: &'a device::MacDevice<'a>,
+        mac: &'a dyn device::MacDevice<'a>,
         grant: Grant<App>,
         kernel_tx: &'static mut [u8],
     ) -> RadioDriver<'a> {

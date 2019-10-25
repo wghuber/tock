@@ -10,17 +10,18 @@
 //! ```
 
 /// Syscall driver number.
-pub const DRIVER_NUM: usize = 0x00000006;
+use crate::driver;
+pub const DRIVER_NUM: usize = driver::NUM::Dac as usize;
 
 use kernel::hil;
 use kernel::{AppId, Driver, ReturnCode};
 
 pub struct Dac<'a> {
-    dac: &'a hil::dac::DacChannel,
+    dac: &'a dyn hil::dac::DacChannel,
 }
 
 impl Dac<'a> {
-    pub fn new(dac: &'a hil::dac::DacChannel) -> Dac<'a> {
+    pub fn new(dac: &'a dyn hil::dac::DacChannel) -> Dac<'a> {
         Dac { dac: dac }
     }
 }

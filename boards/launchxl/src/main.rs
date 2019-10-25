@@ -25,8 +25,6 @@ use kernel::hil::rng::Rng;
 pub mod io;
 
 #[allow(dead_code)]
-mod ccfg_test;
-#[allow(dead_code)]
 mod i2c_tests;
 #[allow(dead_code)]
 mod uart_echo;
@@ -39,7 +37,8 @@ const FAULT_RESPONSE: kernel::procs::FaultResponse = kernel::procs::FaultRespons
 
 // Number of concurrent processes this platform supports.
 const NUM_PROCS: usize = 3;
-static mut PROCESSES: [Option<&'static kernel::procs::ProcessType>; NUM_PROCS] = [None, None, None];
+static mut PROCESSES: [Option<&'static dyn kernel::procs::ProcessType>; NUM_PROCS] =
+    [None, None, None];
 
 #[link_section = ".app_memory"]
 // Give half of RAM to be dedicated APP memory
@@ -57,7 +56,7 @@ pub struct Platform {
     button: &'static capsules::button::Button<'static>,
     alarm: &'static capsules::alarm::AlarmDriver<
         'static,
-        capsules::virtual_alarm::VirtualMuxAlarm<'static, cc26x2::rtc::Rtc>,
+        capsules::virtual_alarm::VirtualMuxAlarm<'static, cc26x2::rtc::Rtc<'static>>,
     >,
     rng: &'static capsules::rng::RngDriver<'static>,
     i2c_master: &'static capsules::i2c_master::I2CMasterDriver<cc26x2::i2c::I2CMaster<'static>>,
@@ -67,7 +66,7 @@ pub struct Platform {
 impl kernel::Platform for Platform {
     fn with_driver<F, R>(&self, driver_num: usize, f: F) -> R
     where
-        F: FnOnce(Option<&kernel::Driver>) -> R,
+        F: FnOnce(Option<&dyn kernel::Driver>) -> R,
     {
         match driver_num {
             capsules::console::DRIVER_NUM => f(Some(self.console)),
@@ -180,7 +179,7 @@ pub unsafe fn reset_handler() {
     // LEDs
     let led_pins = static_init!(
         [(
-            &'static kernel::hil::gpio::Pin,
+            &'static dyn kernel::hil::gpio::Pin,
             capsules::led::ActivationMode
         ); 2],
         [
@@ -201,7 +200,10 @@ pub unsafe fn reset_handler() {
 
     // BUTTONS
     let button_pins = static_init!(
-        [(&'static gpio::InterruptValuePin, capsules::button::GpioMode); 2],
+        [(
+            &'static dyn gpio::InterruptValuePin,
+            capsules::button::GpioMode
+        ); 2],
         [
             (
                 static_init!(
@@ -302,7 +304,7 @@ pub unsafe fn reset_handler() {
 
     // Setup for remaining GPIO pins
     let gpio_pins = static_init!(
-        [&'static kernel::hil::gpio::InterruptValuePin; 1],
+        [&'static dyn kernel::hil::gpio::InterruptValuePin; 1],
         [
             // This is the order they appear on the launchxl headers.
             // Pins 5, 8, 11, 29, 30
@@ -332,7 +334,7 @@ pub unsafe fn reset_handler() {
         capsules::virtual_alarm::MuxAlarm<'static, cc26x2::rtc::Rtc>,
         capsules::virtual_alarm::MuxAlarm::new(&cc26x2::rtc::RTC)
     );
-    rtc.set_client(mux_alarm);
+    hil::time::Alarm::set_client(rtc, mux_alarm);
 
     let virtual_alarm1 = static_init!(
         capsules::virtual_alarm::VirtualMuxAlarm<'static, cc26x2::rtc::Rtc>,
@@ -348,7 +350,7 @@ pub unsafe fn reset_handler() {
             board_kernel.create_grant(&memory_allocation_capability)
         )
     );
-    virtual_alarm1.set_client(alarm);
+    hil::time::Alarm::set_client(virtual_alarm1, alarm);
 
     let entropy_to_random = static_init!(
         capsules::rng::Entropy32ToRandom<'static>,

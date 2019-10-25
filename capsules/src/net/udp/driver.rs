@@ -17,7 +17,8 @@ use core::{cmp, mem};
 use kernel::{debug, AppId, AppSlice, Callback, Driver, Grant, ReturnCode, Shared};
 
 /// Syscall number
-pub const DRIVER_NUM: usize = 0x30002;
+use crate::driver;
+pub const DRIVER_NUM: usize = driver::NUM::Udp as usize;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct UDPEndpoint {
@@ -69,7 +70,7 @@ pub struct App {
 #[allow(dead_code)]
 pub struct UDPDriver<'a> {
     /// UDP sender
-    sender: &'a UDPSender<'a>,
+    sender: &'a dyn UDPSender<'a>,
 
     /// UDP receiver
     receiver: &'a UDPReceiver<'a>,
@@ -88,7 +89,7 @@ pub struct UDPDriver<'a> {
 
 impl<'a> UDPDriver<'a> {
     pub fn new(
-        sender: &'a UDPSender<'a>,
+        sender: &'a dyn UDPSender<'a>,
         receiver: &'a UDPReceiver<'a>,
         grant: Grant<App>,
         interface_list: &'static [IPAddr],
